@@ -68,9 +68,8 @@ export default function MemberLoginPage() {
     sessionStorage.removeItem("loggingOut");
   }, []);
 
-  const supabase = createClient();
-
   const handleLogin = async (e: React.FormEvent) => {
+    const supabase = createClient();
     e.preventDefault();
     setLoading(true);
     setError(null);

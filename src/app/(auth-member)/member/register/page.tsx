@@ -80,9 +80,8 @@ export default function MemberRegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const supabase = createClient();
-
   const handleRegister = async (e: React.FormEvent) => {
+    const supabase = createClient();
     e.preventDefault();
     setLoading(true);
     setError(null);
