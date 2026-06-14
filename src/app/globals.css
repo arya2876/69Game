@@ -1,26 +1,233 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-background: #0F172A;
+  --color-foreground: #f1f5f9;
+  --color-neon-purple: #A855F7;
+  --color-neon-blue: #3B82F6;
+  --color-neon-purple-dark: #7C3AED;
+  --color-neon-blue-dark: #2563EB;
+  --color-neon-green: #10B981;
+  --color-glass: rgba(255, 255, 255, 0.05);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-surface: rgba(15, 23, 42, 0.8);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --font-heading: var(--font-rajdhani);
+  --font-body: var(--font-inter);
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 2s ease-in-out infinite;
+  --animate-slide-up: slide-up 0.6s ease-out forwards;
+  --animate-shimmer: shimmer 2s linear infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
   }
 }
 
+/* ── Base Styles ────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(180deg, #0F172A 0%, #050a14 50%, #000000 100%);
+  color: var(--color-foreground);
+  font-family: var(--font-body), system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ── Selection ──────────────────────────────────────────── */
+::selection {
+  background: rgba(168, 85, 247, 0.3);
+  color: #fff;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #A855F7, #3B82F6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #c084fc, #60a5fa);
+}
+
+/* ── Glassmorphism Card ─────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── Neon Glow Text ─────────────────────────────────────── */
+.neon-text {
+  text-shadow:
+    0 0 7px rgba(168, 85, 247, 0.6),
+    0 0 10px rgba(168, 85, 247, 0.4),
+    0 0 21px rgba(168, 85, 247, 0.3),
+    0 0 42px rgba(59, 130, 246, 0.2);
+}
+
+.neon-text-blue {
+  text-shadow:
+    0 0 7px rgba(59, 130, 246, 0.6),
+    0 0 10px rgba(59, 130, 246, 0.4),
+    0 0 21px rgba(59, 130, 246, 0.3);
+}
+
+/* ── Gradient Text ──────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #A855F7 0%, #3B82F6 50%, #A855F7 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-animated {
+  background: linear-gradient(135deg, #A855F7 0%, #3B82F6 25%, #c084fc 50%, #3B82F6 75%, #A855F7 100%);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ── Gradient Button ────────────────────────────────────── */
+.btn-gradient {
+  background: linear-gradient(135deg, #A855F7 0%, #3B82F6 100%);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 0.75rem 2rem;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #c084fc 0%, #60a5fa 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: inherit;
+}
+
+.btn-gradient:hover {
+  box-shadow:
+    0 0 15px rgba(168, 85, 247, 0.5),
+    0 0 30px rgba(168, 85, 247, 0.3),
+    0 0 45px rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-gradient:hover::before {
+  opacity: 1;
+}
+
+.btn-gradient span {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Outline Button ─────────────────────────────────────── */
+.btn-outline {
+  border: 2px solid transparent;
+  background-image: linear-gradient(#0F172A, #0F172A), linear-gradient(135deg, #A855F7, #3B82F6);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  color: #c084fc;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 0.75rem 2rem;
+  transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+  background-image: linear-gradient(rgba(168, 85, 247, 0.15), rgba(59, 130, 246, 0.15)), linear-gradient(135deg, #A855F7, #3B82F6);
+  box-shadow:
+    0 0 15px rgba(168, 85, 247, 0.3),
+    0 0 30px rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+/* ── Glow Card ──────────────────────────────────────────── */
+.glow-card {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glow-card:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow:
+    0 0 20px rgba(168, 85, 247, 0.15),
+    0 0 40px rgba(59, 130, 246, 0.1),
+    inset 0 0 20px rgba(168, 85, 247, 0.05);
+  transform: translateY(-4px);
+}
+
+/* ── Section Heading Underline ──────────────────────────── */
+.section-heading::after {
+  content: '';
+  display: block;
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, #A855F7, #3B82F6);
+  margin: 1rem auto 0;
+  border-radius: 2px;
+}
+
+/* ── Noise Overlay (for texture) ────────────────────────── */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* ── Hide scrollbar for horizontal scroll ───────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
