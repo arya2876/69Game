@@ -62,13 +62,20 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
   const duration = fmtDuration(booking.start_time, booking.end_time);
   const bookingId = booking.id.slice(0, 8).toUpperCase();
 
-  const itemRows = items.map(i => `
+  // For 58mm paper: 3-column table (Item + Qty on one line, amount right-aligned)
+  const itemRows = [
+    // Room rental row
+    `<tr>
+      <td class="item-name">Sewa ${facilityName}<br><span class="item-sub">${duration} · 1×</span></td>
+      <td class="item-price">${fmt(booking.base_amount)}</td>
+    </tr>`,
+    // Extra items
+    ...items.map(i => `
     <tr>
-      <td>${i.item_name}</td>
-      <td style="text-align:center">${i.quantity}×</td>
-      <td style="text-align:right">${fmt(i.unit_price)}</td>
-      <td style="text-align:right">${fmt(i.subtotal)}</td>
-    </tr>`).join("");
+      <td class="item-name">${i.item_name}<br><span class="item-sub">${i.quantity}× @ ${fmt(i.unit_price)}</span></td>
+      <td class="item-price">${fmt(i.subtotal)}</td>
+    </tr>`),
+  ].join("");
 
   w.document.write(`<!DOCTYPE html>
 <html lang="id">
@@ -76,21 +83,34 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
   <meta charset="UTF-8">
   <title>Struk 69Game #${bookingId}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', monospace; }
-    body { max-width: 320px; margin: 0 auto; padding: 20px 10px; font-size: 12px; color: #111; }
-    .center { text-align: center; }
-    .brand { font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 2px; }
-    .sub { font-size: 10px; color: #555; margin-bottom: 12px; }
-    .divider { border-top: 1px dashed #aaa; margin: 10px 0; }
-    .row { display: flex; justify-content: space-between; margin: 3px 0; }
-    .row-label { color: #555; }
-    table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-    th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 0; border-bottom: 1px solid #ddd; }
-    td { padding: 4px 0; vertical-align: top; }
-    .total-row { font-size: 14px; font-weight: 900; }
-    .method { display: inline-block; border: 1px solid #000; padding: 2px 8px; border-radius: 3px; font-weight: 700; font-size: 11px; margin-top: 4px; }
-    .footer { margin-top: 16px; font-size: 9px; color: #999; text-align: center; }
-    @media print { button { display: none !important; } body { padding: 0; } }
+    /* ── 58mm thermal printer ── */
+    @page {
+      size: 58mm auto;   /* width = paper width, height = content */
+      margin: 0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10px;
+      color: #000;
+      width: 52mm;          /* 58mm - 3mm margin each side */
+      margin: 0 auto;
+      padding: 3mm 0;
+    }
+    .center  { text-align: center; }
+    .brand   { font-size: 15px; font-weight: 900; letter-spacing: 3px; }
+    .sub     { font-size: 8px; color: #444; margin-top: 1mm; }
+    .divider { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
+    .row     { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
+    .label   { color: #555; }
+    table    { width: 100%; border-collapse: collapse; margin: 1mm 0; }
+    .item-name  { font-size: 10px; padding: 1.5mm 0; vertical-align: top; line-height: 1.4; }
+    .item-sub   { font-size: 8px; color: #555; }
+    .item-price { font-size: 10px; text-align: right; vertical-align: top; padding: 1.5mm 0; white-space: nowrap; }
+    .total-row  { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; margin: 2mm 0 1mm; }
+    .method     { display: inline-block; border: 1px solid #000; padding: 1mm 3mm; font-weight: 700; font-size: 10px; margin-top: 1mm; }
+    .footer     { font-size: 8px; color: #666; text-align: center; margin-top: 3mm; line-height: 1.6; }
+    @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
@@ -98,42 +118,36 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
     <div class="brand">69GAME</div>
     <div class="sub">Gaming Lounge Semarang</div>
   </div>
-  <div class="divider"></div>
-  <div class="row"><span class="row-label">No. Struk</span><span><b>#${bookingId}</b></span></div>
-  <div class="row"><span class="row-label">Tanggal</span><span>${fmtDt(booking.created_at)}</span></div>
-  <div class="row"><span class="row-label">Pelanggan</span><span>${customerName}</span></div>
-  <div class="divider"></div>
-  <div class="row"><span class="row-label">Fasilitas</span><span>${facilityName}</span></div>
-  <div class="row"><span class="row-label">Durasi</span><span>${duration}</span></div>
-  <div class="row"><span class="row-label">Mulai</span><span>${fmtDt(booking.start_time)}</span></div>
-  <div class="row"><span class="row-label">Selesai</span><span>${fmtDt(booking.end_time)}</span></div>
-  <div class="divider"></div>
-  <table>
-    <thead><tr>
-      <th style="text-align:left">Item</th>
-      <th style="text-align:center">Qty</th>
-      <th style="text-align:right">Harga</th>
-      <th style="text-align:right">Subtotal</th>
-    </tr></thead>
-    <tbody>
-      <tr>
-        <td>Sewa ${facilityName}</td>
-        <td style="text-align:center">1×</td>
-        <td style="text-align:right">${fmt(booking.base_amount)}</td>
-        <td style="text-align:right">${fmt(booking.base_amount)}</td>
-      </tr>
-      ${itemRows}
-    </tbody>
-  </table>
-  <div class="divider"></div>
-  <div class="row total-row"><span>TOTAL</span><span>${fmt(grandTotal)}</span></div>
+
+  <hr class="divider">
+
+  <div class="row"><span class="label">No.</span><span><b>#${bookingId}</b></span></div>
+  <div class="row"><span class="label">Tgl</span><span>${fmtDt(booking.created_at)}</span></div>
+  <div class="row"><span class="label">Pelanggan</span><span>${customerName}</span></div>
+
+  <hr class="divider">
+
+  <div class="row"><span class="label">Ruangan</span><span>${facilityName}</span></div>
+  <div class="row"><span class="label">Mulai</span><span>${fmtDt(booking.start_time)}</span></div>
+  <div class="row"><span class="label">Selesai</span><span>${fmtDt(booking.end_time)}</span></div>
+
+  <hr class="divider">
+
+  <table><tbody>${itemRows}</tbody></table>
+
+  <hr class="divider">
+
+  <div class="total-row"><span>TOTAL</span><span>${fmt(grandTotal)}</span></div>
   ${booking.payment_method ? `<div class="center"><span class="method">${booking.payment_method}</span></div>` : ""}
-  <div class="divider"></div>
+
+  <hr class="divider">
+
   <div class="footer">
     Terima kasih telah bermain di 69Game!<br>
-    Sampai jumpa lagi 🎮
+    Sampai jumpa lagi &amp; jangan lupa booking!
   </div>
-  <script>window.onload = () => window.print();</script>
+
+  <script>window.onload = () => { window.focus(); window.print(); }</script>
 </body>
 </html>`);
   w.document.close();
