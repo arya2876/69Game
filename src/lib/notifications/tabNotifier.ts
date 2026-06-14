@@ -7,6 +7,7 @@ export const BC_CHANNEL = "69game-notifications";
 export type BCMessage =
   | { type: "new-order" }
   | { type: "warning-10min"; bookingId: string; roomName: string }
+  | { type: "warning-5min"; bookingId: string; roomName: string }
   | { type: "overstay-start"; bookingId: string; roomName: string }
   | { type: "overstay-stop"; bookingId: string };
 

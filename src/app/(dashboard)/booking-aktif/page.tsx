@@ -437,6 +437,7 @@ export default function BookingAktifPage() {
 
   // Audio alert tracking
   const warned10minRef = useRef<Set<string>>(new Set());
+  const warned5minRef = useRef<Set<string>>(new Set());
   const overstayIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   // Modal state
@@ -482,6 +483,14 @@ export default function BookingAktifPage() {
         broadcast({ type: "warning-10min", bookingId: b.rawId, roomName: b.facility });
       }
 
+      // Single chime when crossing into the 5-min warning zone
+      if (remaining > 0 && remaining <= 5 * 60 * 1000 && !warned5minRef.current.has(b.rawId)) {
+        warned5minRef.current.add(b.rawId);
+        playWarningChime();
+        addTitleAlert(`warn5:${b.facility}`);
+        broadcast({ type: "warning-5min", bookingId: b.rawId, roomName: b.facility });
+      }
+
       // Repeating beep every 30 s for overstay rooms
       if (remaining <= 0 && !overstayIntervalsRef.current.has(b.rawId)) {
         playOverstayBeep();
@@ -525,15 +534,15 @@ export default function BookingAktifPage() {
       alert(d.error ?? "Gagal menambah waktu");
       return;
     }
-    // Reset audio state so alerts can re-trigger if needed
+    // Reset audio state so alerts can re-trigger after time is added
     warned10minRef.current.delete(id);
+    warned5minRef.current.delete(id);
     const interval = overstayIntervalsRef.current.get(id);
     if (interval) {
       clearInterval(interval);
       overstayIntervalsRef.current.delete(id);
       broadcast({ type: "overstay-stop", bookingId: id });
     }
-    warned10minRef.current.delete(id);
     setAddTimeId(null);
   }, []);
 
@@ -569,6 +578,7 @@ export default function BookingAktifPage() {
   const handleCheckoutSuccess = useCallback((bookingId: string) => {
     setReceiptId(bookingId);
     warned10minRef.current.delete(bookingId);
+    warned5minRef.current.delete(bookingId);
     const interval = overstayIntervalsRef.current.get(bookingId);
     if (interval) {
       clearInterval(interval);

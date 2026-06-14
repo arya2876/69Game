@@ -21,7 +21,7 @@ export interface OrderRequestDetail {
   status: "pending" | "preparing" | "completed" | "rejected";
   created_at: string;
   message: string | null;
-  facilities: { name: string; category: string } | null;
+  facilities: { name: string; category: string; booth_number: string | null } | null;
   order_request_items: OrderRequestItemDetail[];
 }
 
@@ -47,7 +47,7 @@ export function useRealtimeOrderRequests(branchId: string | null): UseRealtimeOr
         .from("order_requests")
         .select(`
           id, branch_id, facility_id, booking_id, status, created_at, message,
-          facilities ( name, category ),
+          facilities ( name, category, booth_number ),
           order_request_items (
             id, quantity, notes,
             menu_items ( id, name, price )

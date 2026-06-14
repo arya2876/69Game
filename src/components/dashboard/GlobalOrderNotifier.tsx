@@ -111,6 +111,13 @@ export default function GlobalOrderNotifier() {
     setTimeout(() => removeTitleAlert(`warn:${roomName}`), 15 * 60_000);
   }, []);
 
+  const handleWarning5min = useCallback((bookingId: string, roomName: string) => {
+    playSound(SOUNDS.warning);
+    sendBrowserNotif(`⚠️ 5 Menit Lagi!`, `${roomName} akan habis dalam 5 menit!`, `warn5-${bookingId}`);
+    addTitleAlert(`warn5:${roomName}`);
+    setTimeout(() => removeTitleAlert(`warn5:${roomName}`), 10 * 60_000);
+  }, []);
+
   const startOverstay = useCallback((bookingId: string, roomName: string) => {
     if (overstayIntervalsRef.current.has(bookingId)) return; // already running
 
@@ -170,6 +177,9 @@ export default function GlobalOrderNotifier() {
         case "warning-10min":
           handleWarning10min(msg.bookingId, msg.roomName);
           break;
+        case "warning-5min":
+          handleWarning5min(msg.bookingId, msg.roomName);
+          break;
         case "overstay-start":
           startOverstay(msg.bookingId, msg.roomName);
           break;
@@ -179,7 +189,7 @@ export default function GlobalOrderNotifier() {
       }
     };
     return () => bc.close();
-  }, [handleNewOrder, handleWarning10min, startOverstay, stopOverstay]);
+  }, [handleNewOrder, handleWarning10min, handleWarning5min, startOverstay, stopOverstay]);
 
   // ── Supabase Realtime: new orders (this tab is the leader) ─
   useEffect(() => {
@@ -194,9 +204,17 @@ export default function GlobalOrderNotifier() {
         schema: "public",
         table: "order_requests",
         filter: `branch_id=eq.${activeBranchId}`,
-      }, () => {
+      }, (payload) => {
+        // Deduplicate across tabs: first tab to see this INSERT wins
+        const orderId = (payload.new as { id?: string })?.id;
+        if (orderId) {
+          const key = `snd-${orderId}`;
+          if (localStorage.getItem(key)) return; // another tab already played
+          localStorage.setItem(key, "1");
+          setTimeout(() => localStorage.removeItem(key), 5_000);
+        }
         handleNewOrder();
-        broadcast({ type: "new-order" });
+        // No broadcast needed — all dashboard tabs receive Supabase INSERT directly
       })
       .subscribe();
 
