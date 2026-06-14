@@ -6,6 +6,7 @@ import CloseShiftModal from "@/components/dashboard/CloseShiftModal";
 
 // ── RAW SVG ICONS ───────────────────────────────────────────
 const SvgSearch = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>);
+const SvgMenu = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>);
 const SvgBell = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>);
 const SvgChevronDown = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="6 9 12 15 18 9" /></svg>);
 const SvgBuilding = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" /></svg>);
@@ -28,7 +29,7 @@ function useShiftDuration(openedAt: string | undefined) {
   return label;
 }
 
-export default function DashboardHeader() {
+export default function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) {
   const { profile, activeBranchId, setActiveBranchId, branches, canSwitchBranch, activeBranch, isCashier, activeShift, closeShift } = useUser();
   const [showBranchMenu, setShowBranchMenu] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
@@ -53,14 +54,23 @@ export default function DashboardHeader() {
   return (
     <>
     <header className="h-16 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 z-10 shrink-0">
-      {/* Left: Search Bar */}
-      <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 w-64 sm:w-80 focus-within:border-neon-purple/50 transition-colors">
+      {/* Left: Hamburger (mobile) + Search Bar */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          className="lg:hidden text-slate-400 hover:text-white transition-colors p-1"
+          aria-label="Buka menu"
+        >
+          <SvgMenu />
+        </button>
+      <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 w-40 sm:w-64 lg:w-80 focus-within:border-neon-purple/50 transition-colors">
         <SvgSearch />
         <input
           type="text"
           placeholder="Cari transaksi, member..."
           className="bg-transparent border-none outline-none text-sm text-slate-200 ml-2 w-full placeholder:text-slate-500"
         />
+      </div>
       </div>
 
       {/* Right: Branch Switcher + Live Badge + Bell + Profile */}

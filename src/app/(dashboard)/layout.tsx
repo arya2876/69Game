@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import DashboardSidebar from "@/components/layout/DashboardSidebar";
 import DashboardHeader from "@/components/layout/DashboardHeader";
@@ -18,6 +18,7 @@ const SvgLoader = () => (
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const { loading, profile, error, isCashier, shiftLoading, activeShift, openShift } = useUser();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !profile) {
@@ -62,9 +63,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden font-sans">
-      <DashboardSidebar />
+      <DashboardSidebar isMobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader />
+        <DashboardHeader onMenuToggle={() => setMobileSidebarOpen(prev => !prev)} />
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">
           {children}
         </main>
