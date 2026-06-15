@@ -3,6 +3,7 @@
 import { useUser } from "@/contexts/UserContext";
 import { useRealtimeDashboard } from "@/lib/hooks/useRealtimeDashboard";
 import { useRealtimeFacilities } from "@/lib/hooks/useRealtimeFacilities";
+import CashierDashboard from "@/components/dashboard/CashierDashboard";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -51,9 +52,14 @@ function methodBadge(m: string | null) {
 }
 
 export default function DashboardPage() {
-  const { profile, activeBranchId } = useUser();
-  const { metrics, loading } = useRealtimeDashboard(activeBranchId);
-  const { facilities } = useRealtimeFacilities(activeBranchId);
+  const { profile, activeBranchId, isCashier } = useUser();
+  // Pass null for cashier: prevents duplicate channel subscriptions since
+  // CashierDashboard mounts its own hooks with the real branchId.
+  const ownerBranchId = isCashier ? null : activeBranchId;
+  const { metrics, loading } = useRealtimeDashboard(ownerBranchId);
+  const { facilities } = useRealtimeFacilities(ownerBranchId);
+
+  if (isCashier) return <CashierDashboard />;
 
   const firstName = profile?.full_name.split(" ")[0] ?? "User";
 

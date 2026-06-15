@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Facility, Branch } from "@/lib/types/database";
 import PowerToolsTab from "@/components/dashboard/PowerToolsTab";
 import ShiftManagerTab from "@/components/dashboard/ShiftManagerTab";
+import PrintableQRCodeStandee from "@/components/dashboard/PrintableQRCodeStandee";
 
 // ── SVG ICONS ───────────────────────────────────────────────
 const SvgMonitor = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>);
@@ -841,33 +842,45 @@ export default function PengaturanPage() {
           MODAL: QR CODE BILIK
       ══════════════════════════════════════════════════════ */}
       {qrFacility && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setQrFacility(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-left">
-                <h2 className="text-base font-bold text-white">QR Code Bilik</h2>
-                <p className="text-xs text-slate-400 mt-0.5">{qrFacility.name}{qrFacility.booth_number ? ` · ${qrFacility.booth_number}` : ""}</p>
+        <>
+          {/* Modal — hidden when printing so only the standee below is visible */}
+          <div className="print:hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setQrFacility(null)}>
+            <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-left">
+                  <h2 className="text-base font-bold text-white">QR Code Bilik</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">{qrFacility.name}{qrFacility.booth_number ? ` · ${qrFacility.booth_number}` : ""}</p>
+                </div>
+                <button onClick={() => setQrFacility(null)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all"><SvgX /></button>
               </div>
-              <button onClick={() => setQrFacility(null)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-all"><SvgX /></button>
-            </div>
 
-            <div className="bg-white rounded-2xl p-4 inline-block mb-4">
-              <QRCodeSVG
-                value={`${typeof window !== "undefined" ? window.location.origin : ""}/meja/${qrFacility.id}`}
-                size={180}
-                level="M"
-              />
-            </div>
+              <div className="bg-white rounded-2xl p-4 inline-block mb-4">
+                <QRCodeSVG
+                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/meja/${qrFacility.id}`}
+                  size={180}
+                  level="H"
+                />
+              </div>
 
-            <p className="text-[10px] text-slate-600 font-mono break-all mb-4">/meja/{qrFacility.id}</p>
-            <p className="text-[11px] text-slate-500 mb-5">Scan QR ini untuk memesan F&B atau menghubungi kasir dari bilik.</p>
+              <p className="text-[10px] text-slate-600 font-mono break-all mb-4">/meja/{qrFacility.id}</p>
+              <p className="text-[11px] text-slate-500 mb-5">Scan QR ini untuk memesan F&B atau menghubungi kasir dari bilik.</p>
 
-            <div className="flex gap-3">
-              <button onClick={() => setQrFacility(null)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/5 transition-all border border-slate-800">Tutup</button>
-              <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl bg-neon-purple/20 text-neon-purple border border-neon-purple/30 text-sm font-bold hover:bg-neon-purple/30 transition-all">Print</button>
+              <div className="flex gap-3">
+                <button onClick={() => setQrFacility(null)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/5 transition-all border border-slate-800">Tutup</button>
+                <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl bg-neon-purple/20 text-neon-purple border border-neon-purple/30 text-sm font-bold hover:bg-neon-purple/30 transition-all">
+                  🖨️ Print Standee
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Print-only standee — invisible on screen, takes over the page when window.print() is called */}
+          <PrintableQRCodeStandee
+            facilityName={qrFacility.name}
+            boothNumber={qrFacility.booth_number}
+            qrUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/meja/${qrFacility.id}`}
+          />
+        </>
       )}
 
       {editDetailFac && (

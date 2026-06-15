@@ -33,10 +33,11 @@ interface CloseShiftModalProps {
   shift: Shift;
   cashierName: string;
   onClose: () => void;
+  onDone: () => void;
   onConfirm: () => Promise<ShiftSummary>;
 }
 
-export default function CloseShiftModal({ shift, cashierName, onClose, onConfirm }: CloseShiftModalProps) {
+export default function CloseShiftModal({ shift, cashierName, onClose, onDone, onConfirm }: CloseShiftModalProps) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<ShiftSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +67,7 @@ export default function CloseShiftModal({ shift, cashierName, onClose, onConfirm
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-          onClick={done ? onClose : undefined}
+          onClick={done ? onDone : undefined}
         />
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 16 }}
@@ -80,7 +81,7 @@ export default function CloseShiftModal({ shift, cashierName, onClose, onConfirm
               <h3 className="text-sm font-bold text-white">{done ? "Shift Ditutup" : "Tutup Shift"}</h3>
               <p className="text-xs text-slate-400 mt-0.5">{cashierName}</p>
             </div>
-            <button onClick={onClose} className="p-1.5 text-slate-500 hover:text-white rounded-lg transition-colors">
+            <button onClick={done ? onDone : onClose} className="p-1.5 text-slate-500 hover:text-white rounded-lg transition-colors">
               <SvgClose />
             </button>
           </div>
@@ -124,10 +125,10 @@ export default function CloseShiftModal({ shift, cashierName, onClose, onConfirm
                 </div>
 
                 <button
-                  onClick={onClose}
+                  onClick={onDone}
                   className="w-full py-3 rounded-xl bg-neon-purple/15 border border-neon-purple/40 text-neon-purple text-sm font-bold flex items-center justify-center gap-2 hover:bg-neon-purple/25 transition-all"
                 >
-                  <SvgCheck /> Selesai
+                  <SvgCheck /> Selesai & Keluar
                 </button>
               </>
             ) : (

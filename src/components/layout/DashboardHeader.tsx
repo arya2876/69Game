@@ -30,7 +30,7 @@ function useShiftDuration(openedAt: string | undefined) {
 }
 
 export default function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => void }) {
-  const { profile, activeBranchId, setActiveBranchId, branches, canSwitchBranch, activeBranch, isCashier, activeShift, closeShift } = useUser();
+  const { profile, activeBranchId, setActiveBranchId, branches, canSwitchBranch, activeBranch, isCashier, activeShift, closeShift, signOut } = useUser();
   const [showBranchMenu, setShowBranchMenu] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -188,6 +188,7 @@ export default function DashboardHeader({ onMenuToggle }: { onMenuToggle: () => 
         shift={activeShift}
         cashierName={profile.full_name}
         onClose={() => setShowCloseModal(false)}
+        onDone={() => { setShowCloseModal(false); signOut(); }}
         onConfirm={closeShift}
       />
     )}

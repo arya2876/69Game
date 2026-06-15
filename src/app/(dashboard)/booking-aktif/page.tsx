@@ -9,29 +9,15 @@ import CheckoutModal, { type CheckoutBookingInfo } from "@/components/dashboard/
 import ShiftSummaryBar from "@/components/dashboard/ShiftSummaryBar";
 import { AnimatePresence, motion } from "framer-motion";
 import { broadcast, addTitleAlert, removeTitleAlert, registerFocusStop } from "@/lib/notifications/tabNotifier";
+import { playNTimes } from "@/lib/notifications/soundPlayer";
 import AddMenuModal, { type MenuItem } from "@/components/dashboard/AddMenuModal";
 import { createClient } from "@/lib/supabase/client";
 
-// ── Audio (module-level singleton) ──────────────────────────
+// ── Audio ────────────────────────────────────────────────────
 
-function playSound(src: string, volume = 0.8) {
-  if (typeof window === "undefined") return;
-  const audio = new Audio(src);
-  audio.volume = volume;
-  audio.play().catch(() => {});
-}
-
-function playWarningChime() {
-  playSound("/sounds/Peringatan 10 menit.wav");
-}
-
-function playOverstayBeep() {
-  playSound("/sounds/Waktu Habis.wav");
-}
-
-export function playOrderIncoming() {
-  playSound("/sounds/Pesanan Masuk.wav");
-}
+function playWarningChime()  { playNTimes("/sounds/Peringatan 10 menit.wav", 3).catch(() => {}); }
+function playWarning5min()   { playNTimes("/sounds/Waktu Tersisa 5 Menit.wav", 3).catch(() => {}); }
+function playOverstayBeep()  { playNTimes("/sounds/Waktu Habis.wav", 3).catch(() => {}); }
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -486,7 +472,7 @@ export default function BookingAktifPage() {
       // Single chime when crossing into the 5-min warning zone
       if (remaining > 0 && remaining <= 5 * 60 * 1000 && !warned5minRef.current.has(b.rawId)) {
         warned5minRef.current.add(b.rawId);
-        playWarningChime();
+        playWarning5min();
         addTitleAlert(`warn5:${b.facility}`);
         broadcast({ type: "warning-5min", bookingId: b.rawId, roomName: b.facility });
       }
@@ -498,7 +484,7 @@ export default function BookingAktifPage() {
         broadcast({ type: "overstay-start", bookingId: b.rawId, roomName: b.facility });
         const interval = setInterval(() => {
           playOverstayBeep();
-          broadcast({ type: "overstay-start", bookingId: b.rawId, roomName: b.facility });
+          // Don't re-broadcast — other tabs already started their own toast from the initial broadcast
         }, 30_000);
         overstayIntervalsRef.current.set(b.rawId, interval);
       }

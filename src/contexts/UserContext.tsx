@@ -84,7 +84,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       throw new Error(err.error ?? "Gagal menutup shift");
     }
     const json = await res.json();
-    setActiveShift(null);
+    // Don't clear activeShift here — caller (onDone) will signOut which navigates to /login.
+    // Clearing it early would trigger ShiftGate before the summary modal is dismissed.
     return json.summary as ShiftSummary;
   }, [activeShift]);
 

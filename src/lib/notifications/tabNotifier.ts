@@ -5,7 +5,7 @@
 export const BC_CHANNEL = "69game-notifications";
 
 export type BCMessage =
-  | { type: "new-order" }
+  | { type: "new-order"; orderType?: "food" | "message" }
   | { type: "warning-10min"; bookingId: string; roomName: string }
   | { type: "warning-5min"; bookingId: string; roomName: string }
   | { type: "overstay-start"; bookingId: string; roomName: string }
@@ -29,7 +29,8 @@ function buildFlashMessages(): string[] {
   const msgs: string[] = [];
   if (_activeAlerts.has("new-order")) msgs.push("🔔 PESANAN MASUK!");
   _activeAlerts.forEach((id) => {
-    if (id.startsWith("warn:")) msgs.push(`⚠️ 10 MENIT LAGI: ${id.slice(5)}`);
+    if (id.startsWith("warn5:")) msgs.push(`⚠️ 5 MENIT LAGI: ${id.slice(6)}`);
+    if (id.startsWith("warn:"))  msgs.push(`⚠️ 10 MENIT LAGI: ${id.slice(5)}`);
     if (id.startsWith("over:")) msgs.push(`🚨 WAKTU HABIS: ${id.slice(5)}`);
   });
   return msgs;

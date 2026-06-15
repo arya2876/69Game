@@ -12,21 +12,16 @@ import {
   removeTitleAlert,
   registerFocusStop,
 } from "@/lib/notifications/tabNotifier";
+import { playNTimes, unlockAudio } from "@/lib/notifications/soundPlayer";
 
-// ── Audio ─────────────────────────────────────────────────────
-
-function playSound(src: string, volume = 0.85) {
-  if (typeof window === "undefined") return;
-  const a = new Audio(src);
-  a.volume = volume;
-  a.play().catch(() => {});
-}
-
+// ── Sound constants ────────────────────────────────────────────
 const SOUNDS = {
-  order:   "/sounds/Pesanan Masuk.wav",
-  warning: "/sounds/Peringatan 10 menit.wav",
-  overstay:"/sounds/Waktu Habis.wav",
-};
+  order:    "/sounds/Pesanan Masuk.wav",
+  message:  "/sounds/Pesan masuk dari customer.wav",
+  warn10:   "/sounds/Peringatan 10 menit.wav",
+  warn5:    "/sounds/Waktu Tersisa 5 Menit.wav",
+  overstay: "/sounds/Waktu Habis.wav",
+} as const;
 
 // ── Browser notification ──────────────────────────────────────
 
@@ -60,7 +55,6 @@ const SvgAlert = () => (
 interface OverstayAlert {
   bookingId: string;
   roomName: string;
-  intervalId: ReturnType<typeof setInterval>;
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -77,7 +71,7 @@ export default function GlobalOrderNotifier() {
   // Active overstay alerts visible as toasts on this tab
   const [overstayToasts, setOverstayToasts] = useState<{ bookingId: string; roomName: string }[]>([]);
 
-  // Refs for repeating overstay intervals (keyed by bookingId)
+  // Active overstay toasts keyed by bookingId (no interval — source tab handles repeat)
   const overstayIntervalsRef = useRef<Map<string, OverstayAlert>>(new Map());
   const isMounted = useRef(true);
 
@@ -97,52 +91,53 @@ export default function GlobalOrderNotifier() {
 
   // ── Handlers per alert type ───────────────────────────────
 
-  const handleNewOrder = useCallback(() => {
-    playSound(SOUNDS.order);
-    sendBrowserNotif("🔔 Pesanan Masuk!", "Ada pesanan baru dari customer.", "new-order");
+  const handleNewOrder = useCallback((orderType: "food" | "message" = "food") => {
+    const sound = orderType === "message" ? SOUNDS.message : SOUNDS.order;
+    playNTimes(sound, 3).catch(() => {});
+    const notifTitle = orderType === "message" ? "💬 Pesan Masuk!" : "🔔 Pesanan Masuk!";
+    const notifBody  = orderType === "message"
+      ? "Ada pesan baru dari customer."
+      : "Ada pesanan F&B baru dari customer.";
+    sendBrowserNotif(notifTitle, notifBody, "new-order");
     addTitleAlert("new-order");
     setTimeout(() => removeTitleAlert("new-order"), 30_000);
   }, []);
 
   const handleWarning10min = useCallback((bookingId: string, roomName: string) => {
-    playSound(SOUNDS.warning);
+    playNTimes(SOUNDS.warn10, 3).catch(() => {});
     sendBrowserNotif(`⚠️ 10 Menit Lagi`, `${roomName} akan habis dalam 10 menit.`, `warn-${bookingId}`);
     addTitleAlert(`warn:${roomName}`);
     setTimeout(() => removeTitleAlert(`warn:${roomName}`), 15 * 60_000);
   }, []);
 
   const handleWarning5min = useCallback((bookingId: string, roomName: string) => {
-    playSound(SOUNDS.warning);
+    playNTimes(SOUNDS.warn5, 3).catch(() => {});
     sendBrowserNotif(`⚠️ 5 Menit Lagi!`, `${roomName} akan habis dalam 5 menit!`, `warn5-${bookingId}`);
     addTitleAlert(`warn5:${roomName}`);
     setTimeout(() => removeTitleAlert(`warn5:${roomName}`), 10 * 60_000);
   }, []);
 
   const startOverstay = useCallback((bookingId: string, roomName: string) => {
-    if (overstayIntervalsRef.current.has(bookingId)) return; // already running
+    if (overstayIntervalsRef.current.has(bookingId)) return;
 
-    playSound(SOUNDS.overstay);
+    // Play once — the source tab (booking-aktif / CashierDashboard) handles the 30s repeat.
+    // This tab just shows a persistent toast + title flash so the user knows even in other tabs.
+    playNTimes(SOUNDS.overstay, 3).catch(() => {});
     sendBrowserNotif(`🚨 Waktu Habis!`, `${roomName} sudah melewati batas waktu. Segera checkout!`, `over-${bookingId}`);
     addTitleAlert(`over:${roomName}`);
+
+    overstayIntervalsRef.current.set(bookingId, { bookingId, roomName });
 
     if (isMounted.current) {
       setOverstayToasts((prev) =>
         prev.find((t) => t.bookingId === bookingId) ? prev : [...prev, { bookingId, roomName }]
       );
     }
-
-    const intervalId = setInterval(() => {
-      playSound(SOUNDS.overstay);
-      sendBrowserNotif(`🚨 Waktu Habis!`, `${roomName} sudah melewati batas waktu. Segera checkout!`, `over-${bookingId}`);
-    }, 30_000);
-
-    overstayIntervalsRef.current.set(bookingId, { bookingId, roomName, intervalId });
   }, []);
 
   const stopOverstay = useCallback((bookingId: string) => {
     const alert = overstayIntervalsRef.current.get(bookingId);
     if (!alert) return;
-    clearInterval(alert.intervalId);
     overstayIntervalsRef.current.delete(bookingId);
     removeTitleAlert(`over:${alert.roomName}`);
     if (isMounted.current) {
@@ -151,20 +146,17 @@ export default function GlobalOrderNotifier() {
   }, []);
 
   const dismissOverstayToast = useCallback((bookingId: string) => {
-    // Stop sound on this tab only — does NOT end the booking
     stopOverstay(bookingId);
   }, [stopOverstay]);
 
   // ── Cleanup on unmount ────────────────────────────────────
   useEffect(() => {
-    const intervals = overstayIntervalsRef.current;
     return () => {
       isMounted.current = false;
-      intervals.forEach((a) => clearInterval(a.intervalId));
     };
   }, []);
 
-  // ── BroadcastChannel: receive from booking-aktif tab ─────
+  // ── BroadcastChannel: receive from other tabs ─────────────
   useEffect(() => {
     if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
     const bc = new BroadcastChannel(BC_CHANNEL);
@@ -172,7 +164,7 @@ export default function GlobalOrderNotifier() {
       const msg = e.data as BCMessage;
       switch (msg.type) {
         case "new-order":
-          handleNewOrder();
+          handleNewOrder(msg.orderType ?? "food");
           break;
         case "warning-10min":
           handleWarning10min(msg.bookingId, msg.roomName);
@@ -191,7 +183,7 @@ export default function GlobalOrderNotifier() {
     return () => bc.close();
   }, [handleNewOrder, handleWarning10min, handleWarning5min, startOverstay, stopOverstay]);
 
-  // ── Supabase Realtime: new orders (this tab is the leader) ─
+  // ── Supabase Realtime: new orders ─────────────────────────
   useEffect(() => {
     isMounted.current = true;
     if (!activeBranchId) return;
@@ -209,12 +201,18 @@ export default function GlobalOrderNotifier() {
         const orderId = (payload.new as { id?: string })?.id;
         if (orderId) {
           const key = `snd-${orderId}`;
-          if (localStorage.getItem(key)) return; // another tab already played
+          if (localStorage.getItem(key)) return;
           localStorage.setItem(key, "1");
           setTimeout(() => localStorage.removeItem(key), 5_000);
         }
-        handleNewOrder();
-        // No broadcast needed — all dashboard tabs receive Supabase INSERT directly
+
+        // Determine order type: has a text message vs food items
+        const msgText = (payload.new as { message?: string | null })?.message;
+        const orderType: "food" | "message" =
+          typeof msgText === "string" && msgText.trim().length > 0 ? "message" : "food";
+
+        handleNewOrder(orderType);
+        broadcast({ type: "new-order", orderType });
       })
       .subscribe();
 
@@ -223,7 +221,8 @@ export default function GlobalOrderNotifier() {
 
   // ── Activate handler ──────────────────────────────────────
   const handleActivate = () => {
-    playSound(SOUNDS.order, 0.5);
+    // Unlock AudioContext + preload all buffers during this user gesture
+    unlockAudio();
     if ("Notification" in window && Notification.permission !== "granted") {
       Notification.requestPermission().then((perm) => {
         if (isMounted.current) setNotifGranted(perm === "granted");
@@ -238,7 +237,7 @@ export default function GlobalOrderNotifier() {
 
   return (
     <>
-      {/* ── Overstay toasts (other tabs only — booking-aktif handles its own) ── */}
+      {/* ── Overstay toasts ── */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
         {overstayToasts.map((toast) => (
           <div
