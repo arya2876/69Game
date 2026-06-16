@@ -13,9 +13,11 @@ interface BookingDetail {
   payment_method: string | null;
   start_time: string;
   end_time: string;
+  is_open_session: boolean;
   created_at: string;
   member: { full_name: string } | null;
   facility: { name: string; category: string } | null;
+  cashier: { full_name: string } | null;
 }
 
 interface OrderItemDetail {
@@ -43,7 +45,8 @@ function fmtDt(iso: string) {
   return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function fmtDuration(startIso: string, endIso: string) {
+function fmtDuration(startIso: string, endIso: string, isOpen = false) {
+  if (isOpen) return "Open Session";
   const mins = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000);
   if (mins < 60) return `${mins} menit`;
   const h = Math.floor(mins / 60);
@@ -57,19 +60,18 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
   const w = window.open("", "_blank");
   if (!w) { alert("Izinkan popup untuk mencetak struk."); return; }
 
-  const facilityName = booking.facility?.name ?? "Unknown";
-  const customerName = booking.member?.full_name ?? "Walk-in Guest";
-  const duration = fmtDuration(booking.start_time, booking.end_time);
-  const bookingId = booking.id.slice(0, 8).toUpperCase();
+  const facilityName  = booking.facility?.name ?? "Unknown";
+  const customerName  = booking.member?.full_name ?? "Walk-in Guest";
+  const cashierName   = booking.cashier?.full_name ?? "—";
+  const duration      = fmtDuration(booking.start_time, booking.end_time, booking.is_open_session);
+  const bookingId     = booking.id.slice(0, 8).toUpperCase();
+  const logoUrl       = `${window.location.origin}/Logo69%20Nota.png`;
 
-  // For 58mm paper: 3-column table (Item + Qty on one line, amount right-aligned)
   const itemRows = [
-    // Room rental row
     `<tr>
       <td class="item-name">Sewa ${facilityName}<br><span class="item-sub">${duration} · 1×</span></td>
       <td class="item-price">${fmt(booking.base_amount)}</td>
     </tr>`,
-    // Extra items
     ...items.map(i => `
     <tr>
       <td class="item-name">${i.item_name}<br><span class="item-sub">${i.quantity}× @ ${fmt(i.unit_price)}</span></td>
@@ -77,33 +79,29 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
     </tr>`),
   ].join("");
 
-  w.document.write(`<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
   <title>Struk 69Game #${bookingId}</title>
   <style>
-    /* ── 58mm thermal printer ── */
-    @page {
-      size: 58mm auto;   /* width = paper width, height = content */
-      margin: 0;
-    }
+    @page { size: 58mm auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Courier New', Courier, monospace;
       font-size: 10px;
       color: #000;
-      width: 52mm;          /* 58mm - 3mm margin each side */
+      width: 52mm;
       margin: 0 auto;
       padding: 3mm 0;
     }
-    .center  { text-align: center; }
-    .brand   { font-size: 15px; font-weight: 900; letter-spacing: 3px; }
-    .sub     { font-size: 8px; color: #444; margin-top: 1mm; }
-    .divider { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
-    .row     { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
-    .label   { color: #555; }
-    table    { width: 100%; border-collapse: collapse; margin: 1mm 0; }
+    .center     { text-align: center; }
+    .logo       { display: block; width: 36mm; height: auto; margin: 0 auto 1.5mm; }
+    .sub        { font-size: 8px; color: #444; margin-top: 1mm; }
+    .divider    { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
+    .row        { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
+    .label      { color: #555; }
+    table       { width: 100%; border-collapse: collapse; margin: 1mm 0; }
     .item-name  { font-size: 10px; padding: 1.5mm 0; vertical-align: top; line-height: 1.4; }
     .item-sub   { font-size: 8px; color: #555; }
     .item-price { font-size: 10px; text-align: right; vertical-align: top; padding: 1.5mm 0; white-space: nowrap; }
@@ -115,7 +113,7 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
 </head>
 <body>
   <div class="center">
-    <div class="brand">69GAME</div>
+    <img class="logo" src="${logoUrl}" alt="69Game" onerror="this.style.display='none'" />
     <div class="sub">Gaming Lounge Semarang</div>
   </div>
 
@@ -123,13 +121,15 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
 
   <div class="row"><span class="label">No.</span><span><b>#${bookingId}</b></span></div>
   <div class="row"><span class="label">Tgl</span><span>${fmtDt(booking.created_at)}</span></div>
+  <div class="row"><span class="label">Kasir</span><span>${cashierName}</span></div>
   <div class="row"><span class="label">Pelanggan</span><span>${customerName}</span></div>
 
   <hr class="divider">
 
   <div class="row"><span class="label">Ruangan</span><span>${facilityName}</span></div>
   <div class="row"><span class="label">Mulai</span><span>${fmtDt(booking.start_time)}</span></div>
-  <div class="row"><span class="label">Selesai</span><span>${fmtDt(booking.end_time)}</span></div>
+  ${!booking.is_open_session ? `<div class="row"><span class="label">Selesai</span><span>${fmtDt(booking.end_time)}</span></div>` : ""}
+  <div class="row"><span class="label">Durasi</span><span>${duration}</span></div>
 
   <hr class="divider">
 
@@ -147,9 +147,12 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
     Sampai jumpa lagi &amp; jangan lupa booking!
   </div>
 
-  <script>window.onload = () => { window.focus(); window.print(); }</script>
+  <script>window.onload = function() { window.focus(); window.print(); }</script>
 </body>
-</html>`);
+</html>`;
+
+  w.document.open();
+  w.document.write(html);
   w.document.close();
 }
 
@@ -170,9 +173,10 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
         supabase
           .from("bookings")
           .select(`
-            id, base_amount, total_amount, payment_method, start_time, end_time, created_at,
+            id, base_amount, total_amount, payment_method, start_time, end_time, is_open_session, created_at,
             member:profiles!bookings_member_id_fkey(full_name),
-            facility:facilities!bookings_facility_id_fkey(name, category)
+            facility:facilities!bookings_facility_id_fkey(name, category),
+            cashier:profiles!bookings_created_by_fkey(full_name)
           `)
           .eq("id", bookingId)
           .single(),
@@ -203,7 +207,7 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
 
   const facilityName = booking?.facility?.name ?? "Unknown";
   const customerName = booking?.member?.full_name ?? "Walk-in Guest";
-  const duration = booking ? fmtDuration(booking.start_time, booking.end_time) : "";
+  const duration = booking ? fmtDuration(booking.start_time, booking.end_time, booking.is_open_session) : "";
   const bookingShortId = booking?.id.slice(0, 8).toUpperCase() ?? "";
 
   const paymentColor: Record<string, string> = {

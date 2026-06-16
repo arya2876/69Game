@@ -43,13 +43,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Facility not found" }, { status: 404 });
     }
 
+    // Allow orders for both fixed-duration sessions (end_time > now) and
+    // open sessions (is_open_session = true, where end_time may be null or past).
     const { data: booking } = await supabase
       .from("bookings")
       .select("id")
       .eq("facility_id", facility_id)
       .eq("status", "active")
-      .gt("end_time", now)
-      .single();
+      .or(`end_time.gt.${now},is_open_session.eq.true`)
+      .maybeSingle();
 
     if (!booking) {
       return NextResponse.json({ error: "No active session for this facility" }, { status: 409 });
