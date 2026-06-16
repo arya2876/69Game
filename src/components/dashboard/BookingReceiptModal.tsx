@@ -93,11 +93,12 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
       color: #000;
       width: 52mm;
       margin: 0 auto;
-      padding: 3mm 0;
+      padding: 1mm 0;
     }
     .center     { text-align: center; }
-    .logo       { display: block; width: 36mm; height: auto; margin: 0 auto 1.5mm; }
-    .sub        { font-size: 8px; color: #444; margin-top: 1mm; }
+    .logo-wrap  { overflow: hidden; height: 13mm; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 0; }
+    .logo       { display: block; width: 32mm; height: auto; }
+    .sub        { font-size: 8px; color: #444; margin-top: 0.5mm; }
     .divider    { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
     .row        { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
     .label      { color: #555; }
@@ -113,7 +114,9 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
 </head>
 <body>
   <div class="center">
-    <img class="logo" src="${logoUrl}" alt="69Game" onerror="this.style.display='none'" />
+    <div class="logo-wrap">
+      <img class="logo" src="${logoUrl}" alt="69Game" onerror="this.parentElement.style.display='none'" />
+    </div>
     <div class="sub">Gaming Lounge Semarang</div>
   </div>
 
