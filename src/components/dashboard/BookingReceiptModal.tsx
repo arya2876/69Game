@@ -96,9 +96,9 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
       padding: 1mm 0;
     }
     .center     { text-align: center; }
-    .logo-wrap  { overflow: hidden; height: 13mm; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 0; }
-    .logo       { display: block; width: 32mm; height: auto; }
-    .sub        { font-size: 8px; color: #444; margin-top: 0.5mm; }
+    .logo-wrap  { overflow: hidden; height: 11mm; display: flex; align-items: flex-start; justify-content: center; }
+    .logo       { display: block; width: 30mm; height: auto; }
+    .sub        { font-size: 8px; color: #444; margin-top: 1mm; }
     .divider    { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
     .row        { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
     .label      { color: #555; }
