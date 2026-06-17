@@ -16,9 +16,10 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from("menu_items")
-      .select("id, branch_id, name, category, price, is_available, created_at")
+      .select("id, branch_id, name, category, fnb_category, price, is_available, created_at")
       .eq("branch_id", branchId)
       .order("category")
+      .order("fnb_category", { nullsFirst: false })
       .order("name");
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, category, price } = body as { name: string; category: string; price: number };
+    const { name, category, price, fnb_category } = body as { name: string; category: string; price: number; fnb_category?: string | null };
 
     if (!name?.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
     if (!["fnb", "extra_time"].includes(category)) return NextResponse.json({ error: "category must be fnb or extra_time" }, { status: 400 });
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
         branch_id: profile.branch_id,
         name: name.trim(),
         category,
+        fnb_category: category === "fnb" ? (fnb_category?.trim() || null) : null,
         price: Math.round(price),
         is_available: true,
       })

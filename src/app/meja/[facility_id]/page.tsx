@@ -18,7 +18,6 @@ export default async function MejaPage({ params }: Props) {
 
   if (!facility) return notFound();
 
-  const now = new Date().toISOString();
   const { data: booking } = await supabase
     .from("bookings")
     .select("id, end_time, start_time, is_open_session, total_amount, base_amount")
@@ -28,10 +27,11 @@ export default async function MejaPage({ params }: Props) {
 
   const { data: menuItems } = await supabase
     .from("menu_items")
-    .select("id, name, price, category")
+    .select("id, name, price, category, fnb_category")
     .eq("branch_id", facility.branch_id)
     .eq("category", "fnb")
     .eq("is_available", true)
+    .order("fnb_category", { nullsFirst: false })
     .order("name");
 
   return (

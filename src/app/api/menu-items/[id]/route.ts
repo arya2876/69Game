@@ -35,6 +35,9 @@ export async function PATCH(
       }
       updateData.category = body.category;
     }
+    if (body.fnb_category !== undefined) {
+      updateData.fnb_category = body.category === "extra_time" ? null : (body.fnb_category?.trim() || null);
+    }
     if (body.price !== undefined) {
       const p = Math.round(Number(body.price));
       if (p <= 0) return NextResponse.json({ error: "price must be positive" }, { status: 400 });

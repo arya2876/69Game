@@ -47,6 +47,7 @@ interface MenuItem {
   branch_id: string;
   name: string;
   category: "fnb" | "extra_time";
+  fnb_category: string | null;
   price: number;
   is_available: boolean;
   created_at: string;
@@ -90,7 +91,9 @@ export default function PengaturanPage() {
   const [editMenuId, setEditMenuId] = useState<string | null>(null);
   const [editMenuName, setEditMenuName] = useState("");
   const [editMenuCategory, setEditMenuCategory] = useState<"fnb" | "extra_time">("fnb");
+  const [editMenuFnbCategory, setEditMenuFnbCategory] = useState("");
   const [editMenuPrice, setEditMenuPrice] = useState("");
+  const [newMenuFnbCategory, setNewMenuFnbCategory] = useState("");
 
   // ── Fasilitas State ────────────────────────────────────────
   const [showAddFacility, setShowAddFacility] = useState(false);
@@ -431,12 +434,12 @@ export default function PengaturanPage() {
       const r = await fetch("/api/menu-items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newMenuName, category: newMenuCategory, price: parseInt(newMenuPrice) }),
+        body: JSON.stringify({ name: newMenuName, category: newMenuCategory, fnb_category: newMenuFnbCategory || null, price: parseInt(newMenuPrice) }),
       });
       if (r.ok) {
         const d = await r.json();
         setMenuItems(prev => [...prev, d.item]);
-        setNewMenuName(""); setNewMenuPrice(""); setShowAddMenu(false);
+        setNewMenuName(""); setNewMenuPrice(""); setNewMenuFnbCategory(""); setShowAddMenu(false);
       } else { const d = await r.json(); alert(d.error); }
     } catch { alert("Network error"); } finally { setLoadingAction(null); }
   }, [newMenuName, newMenuCategory, newMenuPrice]);
@@ -447,7 +450,7 @@ export default function PengaturanPage() {
       const r = await fetch(`/api/menu-items/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editMenuName, category: editMenuCategory, price: parseInt(editMenuPrice) }),
+        body: JSON.stringify({ name: editMenuName, category: editMenuCategory, fnb_category: editMenuFnbCategory || null, price: parseInt(editMenuPrice) }),
       });
       if (r.ok) {
         const d = await r.json();
@@ -732,8 +735,19 @@ export default function PengaturanPage() {
               <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><SvgChefHat />Tambah Item Menu</h3>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="sm:col-span-2"><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Nama Menu</label><input value={newMenuName} onChange={e => setNewMenuName(e.target.value)} placeholder="Es Teh Manis" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:border-neon-purple/50 outline-none" /></div>
-                <div><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Kategori</label><select value={newMenuCategory} onChange={e => setNewMenuCategory(e.target.value as "fnb" | "extra_time")} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:border-neon-purple/50 outline-none appearance-none [&>option]:bg-slate-900"><option value="fnb">F&B</option><option value="extra_time">Extra Waktu</option></select></div>
+                <div><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Tipe</label><select value={newMenuCategory} onChange={e => { setNewMenuCategory(e.target.value as "fnb" | "extra_time"); if (e.target.value === "extra_time") setNewMenuFnbCategory(""); }} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:border-neon-purple/50 outline-none appearance-none [&>option]:bg-slate-900"><option value="fnb">F&B</option><option value="extra_time">Extra Waktu</option></select></div>
                 <div><label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Harga</label><div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg overflow-hidden focus-within:border-neon-purple/50"><span className="px-3 py-2.5 bg-slate-900 border-r border-slate-800 text-sm font-bold text-slate-500">Rp</span><input type="number" value={newMenuPrice} onChange={e => setNewMenuPrice(e.target.value)} placeholder="10000" className="w-full bg-transparent border-none px-3 py-2.5 text-sm text-white outline-none font-mono" /></div></div>
+                {newMenuCategory === "fnb" && (
+                  <div className="sm:col-span-4">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1 block">Sub-Kategori F&B <span className="text-slate-600 normal-case font-normal">(opsional)</span></label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {["Minuman", "Cemilan", "Makanan Berat", ...Array.from(new Set(menuItems.filter(m => m.category === "fnb" && m.fnb_category && !["Minuman","Cemilan","Makanan Berat"].includes(m.fnb_category)).map(m => m.fnb_category!)))].map(cat => (
+                        <button key={cat} type="button" onClick={() => setNewMenuFnbCategory(newMenuFnbCategory === cat ? "" : cat)} className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${newMenuFnbCategory === cat ? "bg-amber-500/20 text-amber-400 border-amber-500/40" : "bg-slate-900 text-slate-400 border-slate-700 hover:border-slate-500"}`}>{cat}</button>
+                      ))}
+                    </div>
+                    <input value={newMenuFnbCategory} onChange={e => setNewMenuFnbCategory(e.target.value)} placeholder="Atau ketik kategori baru..." className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500/50 outline-none" />
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-3 mt-4">
                 <button onClick={() => setShowAddMenu(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/5">Batal</button>
@@ -749,17 +763,19 @@ export default function PengaturanPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead><tr className="border-b border-slate-800"><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Nama</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Kategori</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Harga</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Tersedia</th><th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Aksi</th></tr></thead>
+                  <thead><tr className="border-b border-slate-800"><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Nama</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Tipe</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Sub-Kategori</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Harga</th><th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Tersedia</th><th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Aksi</th></tr></thead>
                   <tbody>
                     {menuItems.map(item => (
                       <tr key={item.id} className="border-b border-slate-800/50 hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-3">{editMenuId === item.id ? <input value={editMenuName} onChange={e => setEditMenuName(e.target.value)} className="bg-slate-950 border border-neon-purple/50 rounded px-2 py-1 text-sm text-white outline-none w-40" /> : <span className="text-sm font-semibold text-white">{item.name}</span>}</td>
-                        <td className="px-4 py-3">{editMenuId === item.id ? <select value={editMenuCategory} onChange={e => setEditMenuCategory(e.target.value as "fnb" | "extra_time")} className="bg-slate-950 border border-neon-purple/50 rounded px-2 py-1 text-xs text-white outline-none appearance-none [&>option]:bg-slate-900"><option value="fnb">F&B</option><option value="extra_time">Extra Waktu</option></select> : <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${item.category === "fnb" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-neon-blue/10 text-neon-blue border border-neon-blue/20"}`}>{item.category === "fnb" ? "F&B" : "Extra Waktu"}</span>}</td>
+                        <td className="px-4 py-3">{editMenuId === item.id ? <select value={editMenuCategory} onChange={e => { setEditMenuCategory(e.target.value as "fnb" | "extra_time"); if (e.target.value === "extra_time") setEditMenuFnbCategory(""); }} className="bg-slate-950 border border-neon-purple/50 rounded px-2 py-1 text-xs text-white outline-none appearance-none [&>option]:bg-slate-900"><option value="fnb">F&B</option><option value="extra_time">Extra Waktu</option></select> : <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${item.category === "fnb" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-neon-blue/10 text-neon-blue border border-neon-blue/20"}`}>{item.category === "fnb" ? "F&B" : "Extra Waktu"}</span>}</td>
+                        <td className="px-4 py-3">{editMenuId === item.id && editMenuCategory === "fnb" ? (<input value={editMenuFnbCategory} onChange={e => setEditMenuFnbCategory(e.target.value)} list="fnb-cats-edit" placeholder="Sub-kategori..." className="bg-slate-950 border border-neon-purple/50 rounded px-2 py-1 text-xs text-white outline-none w-32" />) : item.fnb_category ? (<span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">{item.fnb_category}</span>) : <span className="text-slate-600 text-xs">—</span>}</td>
+                        <datalist id="fnb-cats-edit">{["Minuman","Cemilan","Makanan Berat",...Array.from(new Set(menuItems.filter(m=>m.fnb_category).map(m=>m.fnb_category!)))].map(c=><option key={c} value={c}/>)}</datalist>
                         <td className="px-4 py-3">{editMenuId === item.id ? <div className="flex items-center gap-1"><span className="text-xs text-slate-500">Rp</span><input type="number" value={editMenuPrice} onChange={e => setEditMenuPrice(e.target.value)} className="bg-slate-950 border border-neon-purple/50 rounded px-2 py-1 text-sm text-white outline-none w-24 font-mono" /></div> : <span className="text-sm text-white font-mono">Rp {item.price.toLocaleString("id-ID")}</span>}</td>
                         <td className="px-4 py-3"><Toggle enabled={item.is_available} onChange={() => handleToggleMenuAvailability(item)} disabled={loadingAction === item.id} /></td>
                         <td className="px-4 py-3"><div className="flex items-center justify-end gap-2">
                           {editMenuId === item.id ? (<><button onClick={() => handleUpdateMenu(item.id)} disabled={loadingAction === item.id} className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 disabled:opacity-50">{loadingAction === item.id ? "..." : "Simpan"}</button><button onClick={() => setEditMenuId(null)} className="px-2 py-1 rounded bg-slate-800 text-slate-400 text-xs font-bold hover:bg-slate-700">Batal</button></>) : (<>
-                            <button onClick={() => { setEditMenuId(item.id); setEditMenuName(item.name); setEditMenuCategory(item.category); setEditMenuPrice(item.price.toString()); }} className="p-1.5 rounded-lg text-slate-400 hover:text-neon-blue hover:bg-neon-blue/10 transition-all" title="Edit"><SvgPencil /></button>
+                            <button onClick={() => { setEditMenuId(item.id); setEditMenuName(item.name); setEditMenuCategory(item.category); setEditMenuFnbCategory(item.fnb_category ?? ""); setEditMenuPrice(item.price.toString()); }} className="p-1.5 rounded-lg text-slate-400 hover:text-neon-blue hover:bg-neon-blue/10 transition-all" title="Edit"><SvgPencil /></button>
                             <button onClick={() => handleDeleteMenu(item.id, item.name)} disabled={loadingAction === item.id} className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-all disabled:opacity-30" title="Hapus"><SvgTrash /></button>
                           </>)}
                         </div></td>

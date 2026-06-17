@@ -42,6 +42,7 @@ interface MenuItem {
   name: string;
   price: number;
   category: string;
+  fnb_category: string | null;
 }
 
 interface CartItem {
@@ -376,6 +377,7 @@ function ChatSentScreen({ onReset }: { onReset: () => void }) {
 export default function CustomerOrderPage({ facility, booking, menuItems }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"menu" | "chat">("menu");
+  const [activeCategory, setActiveCategory] = useState<string>("Semua");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -607,31 +609,48 @@ export default function CustomerOrderPage({ facility, booking, menuItems }: Prop
       {/* Menu Tab */}
       {activeTab === "menu" && (
         <div className="px-5 pb-32">
-          <div className="flex items-center gap-2 mb-4">
-            <ChefHat className="w-4 h-4 text-neon-purple" />
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Menu F&B</h2>
-            <span className="text-xs text-slate-500">({menuItems.length} item tersedia)</span>
-          </div>
-
           {menuItems.length === 0 ? (
             <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 text-center">
               <ChefHat className="w-8 h-8 text-slate-600 mx-auto mb-3" />
               <p className="text-sm text-slate-500">Belum ada menu F&B tersedia</p>
               <p className="text-xs text-slate-600 mt-1">Gunakan tab <span className="text-neon-blue">Hubungi Kasir</span> untuk menghubungi staf</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {menuItems.map((item) => (
-                <MenuItemCard
-                  key={item.id}
-                  item={item}
-                  cartItem={cart.find((c) => c.menuItemId === item.id)}
-                  onAdd={handleAdd}
-                  onRemove={handleRemove}
-                />
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const cats = ["Semua", ...Array.from(new Set(menuItems.map(m => m.fnb_category ?? "Lainnya")))];
+            const filtered = activeCategory === "Semua" ? menuItems : menuItems.filter(m => (m.fnb_category ?? "Lainnya") === activeCategory);
+            return (
+              <>
+                {/* Category pills */}
+                <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-none">
+                  {cats.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                        activeCategory === cat
+                          ? "bg-neon-purple/20 text-neon-purple border-neon-purple/40"
+                          : "bg-slate-900/60 text-slate-400 border-slate-700 hover:border-slate-500"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {filtered.map((item) => (
+                    <MenuItemCard
+                      key={item.id}
+                      item={item}
+                      cartItem={cart.find((c) => c.menuItemId === item.id)}
+                      onAdd={handleAdd}
+                      onRemove={handleRemove}
+                    />
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
