@@ -341,11 +341,19 @@ export default function KasirWalkInPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [addMenuTarget, setAddMenuTarget] = useState<{ bookingId: string; facilityName: string } | null>(null);
 
-  // Active promo for selected category + duration
+  // Discount promo from room_rates (percentage / fixed price)
   const [activePromo, setActivePromo] = useState<{
     label: string;
     discount_type: "percentage" | "fixed";
     discount_value: number;
+  } | null>(null);
+
+  // Bonus-jam promo: "main X jam gratis Y jam"
+  const [bonusPromo, setBonusPromo] = useState<{
+    id: string;
+    name: string;
+    buy_hours: number;
+    free_hours: number;
   } | null>(null);
 
   useEffect(() => {
@@ -427,6 +435,9 @@ export default function KasirWalkInPage() {
     }
   }, [maxDurationMinutes, availableDeposit, selectedDuration, useDepositMinutes]);
 
+  // Total actual duration (includes free bonus hours from promo)
+  const totalDurationMinutes = maxDurationMinutes + (bonusPromo ? bonusPromo.free_hours * 60 : 0);
+
   const remainingMinutesToPay = Math.max(0, maxDurationMinutes - useDepositMinutes);
   const basePaidAmount = selectedRoom && !isOpenSession
     ? Math.round((remainingMinutesToPay / 60) * selectedRoom.price_per_hour)
@@ -447,7 +458,7 @@ export default function KasirWalkInPage() {
         facilityId: selectedFacility,
         customerName,
         customerWa,
-        durationMinutes: maxDurationMinutes,
+        durationMinutes: totalDurationMinutes, // includes free bonus hours
         useDepositMinutes,
         paidAmount,
         paymentMethod: "Cash"
@@ -463,7 +474,7 @@ export default function KasirWalkInPage() {
     } finally { 
       setSubmitLoading(false); 
     }
-  }, [activeBranchId, customerName, customerWa, selectedFacility, selectedDuration, isRoomActive, isOpenSession, maxDurationMinutes, useDepositMinutes, paidAmount]);
+  }, [activeBranchId, customerName, customerWa, selectedFacility, selectedDuration, isRoomActive, isOpenSession, maxDurationMinutes, totalDurationMinutes, useDepositMinutes, paidAmount]);
 
   const handleQuickBook = useCallback((id: string) => { setSelectedFacility(id); setSelectedDuration(null); document.getElementById("booking-form")?.scrollIntoView({ behavior: "smooth" }); }, []);
 
@@ -494,10 +505,10 @@ export default function KasirWalkInPage() {
     }
   }, []);
 
-  // Lookup active promo for selected category + duration
+  // Lookup discount promo from room_rates
   useEffect(() => {
     if (!activeBranchId || !selectedRoom || typeof selectedDuration !== "number" || selectedDuration <= 0) {
-      setActivePromo(null);
+      setTimeout(() => setActivePromo(null), 0);
       return;
     }
     supabase
@@ -509,9 +520,28 @@ export default function KasirWalkInPage() {
       .eq("is_active", true)
       .eq("is_discount_active", true)
       .maybeSingle()
-      .then(({ data }) => {
-        setActivePromo(data as typeof activePromo ?? null);
-      });
+      .then(({ data }) => { setActivePromo(data as typeof activePromo ?? null); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId, selectedRoom?.category, selectedDuration]);
+
+  // Lookup bonus-jam promo from promos table
+  useEffect(() => {
+    if (!activeBranchId || !selectedRoom || typeof selectedDuration !== "number" || selectedDuration <= 0) {
+      setTimeout(() => setBonusPromo(null), 0);
+      return;
+    }
+    const now = new Date().toISOString();
+    supabase
+      .from("promos")
+      .select("id, name, buy_hours, free_hours")
+      .eq("branch_id", activeBranchId)
+      .eq("is_active", true)
+      .eq("buy_hours", selectedDuration)
+      .or(`facility_category.eq.${selectedRoom.category},facility_category.is.null`)
+      .or(`valid_from.is.null,valid_from.lte.${now}`)
+      .or(`valid_until.is.null,valid_until.gte.${now}`)
+      .maybeSingle()
+      .then(({ data }) => { setBonusPromo(data ?? null); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBranchId, selectedRoom?.category, selectedDuration]);
 
@@ -702,10 +732,32 @@ export default function KasirWalkInPage() {
                         </div>
                       )}
 
+                      {/* Bonus-jam promo banner */}
+                      {bonusPromo && (
+                        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                          <span className="text-emerald-400 text-lg">🎁</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider">{bonusPromo.name}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Bayar {bonusPromo.buy_hours} jam · dapat {bonusPromo.buy_hours + bonusPromo.free_hours} jam total
+                            </p>
+                          </div>
+                          <span className="flex-shrink-0 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-black">
+                            +{bonusPromo.free_hours} JAM GRATIS
+                          </span>
+                        </div>
+                      )}
+
                       <div className="p-3 bg-slate-800/50 border border-slate-700/50 rounded-lg space-y-1.5">
                         {useDepositMinutes > 0 && (
                           <div className="flex items-center justify-between text-xs text-slate-400">
                             <span>Sisa Bayar Cash ({remainingMinutesToPay / 60} jam)</span>
+                          </div>
+                        )}
+                        {bonusPromo && (
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>Durasi sesi</span>
+                            <span className="font-semibold text-emerald-400">{bonusPromo.buy_hours + bonusPromo.free_hours} jam ({totalDurationMinutes} menit)</span>
                           </div>
                         )}
                         {activePromo && (

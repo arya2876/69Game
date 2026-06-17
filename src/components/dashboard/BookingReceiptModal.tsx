@@ -56,7 +56,7 @@ function fmtDuration(startIso: string, endIso: string, isOpen = false) {
 
 // ── Print Receipt ────────────────────────────────────────────
 
-function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTotal: number) {
+function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTotal: number, bayar = 0) {
   const w = window.open("", "_blank");
   if (!w) { alert("Izinkan popup untuk mencetak struk."); return; }
 
@@ -96,7 +96,7 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
       padding: 1mm 0;
     }
     .center     { text-align: center; }
-    .logo       { display: block; width: 22mm; height: auto; margin: 0 auto -8mm; }
+    .logo       { display: block; width: 22mm; height: auto; margin: 0 auto -6.5mm; }
     .sub        { position: relative; font-size: 8px; color: #444; margin-top: 0; }
     .divider    { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
     .row        { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
@@ -114,7 +114,7 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
 <body>
   <div class="center">
     <img class="logo" src="${logoUrl}" alt="69Game" onerror="this.style.display='none'" />
-    <div class="sub">Gaming Lounge Semarang</div>
+    <p><br><span class="sub">Gaming Lounge Semarang</span></p>
   </div>
 
   <hr class="divider">
@@ -138,13 +138,17 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
   <hr class="divider">
 
   <div class="total-row"><span>TOTAL</span><span>${fmt(grandTotal)}</span></div>
+  ${bayar > 0 ? `
+  <div class="row" style="margin-top:1.5mm"><span class="label">Bayar</span><span>${fmt(bayar)}</span></div>
+  <div class="row kembali"><span><b>Kembali</b></span><span><b>${fmt(Math.max(0, bayar - grandTotal))}</b></span></div>
+  ` : ""}
   ${booking.payment_method ? `<div class="center"><span class="method">${booking.payment_method}</span></div>` : ""}
 
   <hr class="divider">
 
   <div class="footer">
     Terima kasih telah bermain di 69Game!<br>
-    Sampai jumpa lagi &amp; jangan lupa booking!
+    Sampai jumpa lagi &amp; jangan lupa datang kembali!
   </div>
 
   <script>window.onload = function() { window.focus(); window.print(); }</script>
@@ -162,11 +166,12 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [items, setItems] = useState<OrderItemDetail[]>([]);
   const [loading, setLoading] = useState(false);
+  const [bayar, setBayar] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
-    if (!isOpen || !bookingId) { setTimeout(() => { setBooking(null); setItems([]); }, 0); return; }
-    setTimeout(() => setLoading(true), 0);
+    if (!isOpen || !bookingId) { setTimeout(() => { setBooking(null); setItems([]); setBayar(""); }, 0); return; }
+    setTimeout(() => { setLoading(true); setBayar(""); }, 0);
 
     (async () => {
       const [{ data: b }, { data: oi }] = await Promise.all([
@@ -204,6 +209,9 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
   const grandTotal = booking
     ? booking.base_amount + extraItems.reduce((s, i) => s + i.subtotal, 0)
     : 0;
+
+  const bayarNum = parseInt(bayar.replace(/\D/g, ""), 10) || 0;
+  const kembalian = bayarNum > 0 ? bayarNum - grandTotal : null;
 
   const facilityName = booking?.facility?.name ?? "Unknown";
   const customerName = booking?.member?.full_name ?? "Walk-in Guest";
@@ -318,6 +326,33 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
                       <span className="text-xl font-black text-white font-mono drop-shadow-[0_0_10px_rgba(168,85,247,0.4)]">{fmt(grandTotal)}</span>
                     </div>
                   </div>
+
+                  {/* Bayar & Kembalian — hanya untuk Cash */}
+                  {booking.payment_method?.toLowerCase() === "cash" && <div className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-4 space-y-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Pembayaran Tunai</p>
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm text-slate-400 shrink-0 w-16">Bayar</label>
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">Rp</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={bayar}
+                          onChange={e => setBayar(e.target.value.replace(/\D/g, ""))}
+                          placeholder="0"
+                          className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white text-sm font-mono focus:outline-none focus:border-neon-purple transition-colors"
+                        />
+                      </div>
+                    </div>
+                    {kembalian !== null && (
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-700">
+                        <span className="text-sm font-bold text-slate-300">Kembali</span>
+                        <span className={`text-lg font-black font-mono ${kembalian >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {kembalian >= 0 ? fmt(kembalian) : "Kurang " + fmt(-kembalian)}
+                        </span>
+                      </div>
+                    )}
+                  </div>}
                 </>
               )}
             </div>
@@ -332,7 +367,7 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
                   Tutup
                 </button>
                 <button
-                  onClick={() => printReceipt(booking, extraItems, grandTotal)}
+                  onClick={() => printReceipt(booking, extraItems, grandTotal, bayarNum)}
                   className="flex-[2] py-2.5 rounded-xl bg-neon-purple/20 border border-neon-purple/30 text-neon-purple text-sm font-bold flex items-center justify-center gap-2 hover:bg-neon-purple/30 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">

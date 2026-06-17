@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // ═══════════════════════════════════════════════════════════════
 // PATCH  /api/facilities/[id] — Update facility (name, price, status, image)
@@ -99,6 +100,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const force = new URL(request.url).searchParams.get("force") === "true";
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -114,10 +116,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden: Owner only" }, { status: 403 });
     }
 
-    // Check for active bookings
     const { data: facility } = await supabase
       .from("facilities")
-      .select("status")
+      .select("status, name")
       .eq("id", id)
       .eq("branch_id", profile.branch_id)
       .single();
@@ -126,9 +127,41 @@ export async function DELETE(
 
     if (facility.status === "active") {
       return NextResponse.json(
-        { error: "Cannot delete facility with active session" },
+        { error: "Tidak bisa menghapus fasilitas yang sedang digunakan. Akhiri sesi terlebih dahulu." },
         { status: 409 }
       );
+    }
+
+    const { count } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("facility_id", id);
+
+    if (count && count > 0 && !force) {
+      return NextResponse.json(
+        {
+          error: `Fasilitas ini memiliki ${count} riwayat booking.`,
+          bookingCount: count,
+          requiresForce: true,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Force delete: hapus semua booking + order_items terlebih dahulu
+    // menggunakan admin client agar bisa bypass RLS
+    if (force && count && count > 0) {
+      const admin = createAdminClient();
+      const { data: bookingIds } = await admin
+        .from("bookings")
+        .select("id")
+        .eq("facility_id", id);
+
+      if (bookingIds && bookingIds.length > 0) {
+        const ids = bookingIds.map(b => b.id);
+        await admin.from("order_items").delete().in("booking_id", ids);
+        await admin.from("bookings").delete().eq("facility_id", id);
+      }
     }
 
     const { error } = await supabase
@@ -138,7 +171,7 @@ export async function DELETE(
       .eq("branch_id", profile.branch_id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ message: "Facility deleted" });
+    return NextResponse.json({ message: "Facility deleted", forced: force && (count ?? 0) > 0 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Internal error" }, { status: 500 });
   }

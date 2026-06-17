@@ -29,7 +29,6 @@ const SvgEyeOff = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const SvgList = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>);
 const SvgQrCode = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="5" y="5" width="3" height="3" /><rect x="16" y="5" width="3" height="3" /><rect x="5" y="16" width="3" height="3" /><line x1="14" y1="14" x2="14" y2="14.01" /><line x1="18" y1="14" x2="18" y2="14.01" /><line x1="21" y1="14" x2="21" y2="14.01" /><line x1="14" y1="18" x2="14" y2="18.01" /><line x1="18" y1="18" x2="18" y2="18.01" /><line x1="21" y1="18" x2="21" y2="18.01" /><line x1="14" y1="21" x2="14" y2="21.01" /></svg>);
 const SvgChefHat = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z" /><line x1="6" y1="17" x2="18" y2="17" /></svg>);
-const SvgZap = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>);
 const SvgClock = () => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>);
 
 // ── TYPES ───────────────────────────────────────────────────
@@ -129,6 +128,17 @@ export default function PengaturanPage() {
   const [editBrHours, setEditBrHours] = useState("");
   const [editBrMaps, setEditBrMaps] = useState("");
 
+  // ── Promo State ────────────────────────────────────────────
+  interface PromoItem { id: string; name: string; buy_hours: number; free_hours: number; facility_category: string | null; valid_from: string | null; valid_until: string | null; is_active: boolean; }
+  const [promos, setPromos] = useState<PromoItem[]>([]);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [showAddPromo, setShowAddPromo] = useState(false);
+  const [promoName, setPromoName] = useState("");
+  const [promoBuyHours, setPromoBuyHours] = useState("2");
+  const [promoFreeHours, setPromoFreeHours] = useState("1");
+  const [promoCategory, setPromoCategory] = useState("");
+  const [promoSaving, setPromoSaving] = useState(false);
+
   // ── Staff State ────────────────────────────────────────────
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
@@ -198,6 +208,44 @@ export default function PengaturanPage() {
     };
   }, [activeTab]);
 
+  // ── Promo Fetch & Handlers ─────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== "tools" || !activeBranchId) return;
+    setPromoLoading(true);
+    fetch(`/api/promos?branch_id=${activeBranchId}`)
+      .then(r => r.json())
+      .then(d => setPromos(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setPromoLoading(false));
+  }, [activeTab, activeBranchId]);
+
+  const handleAddPromo = useCallback(async () => {
+    if (!activeBranchId || !promoName || !promoBuyHours || !promoFreeHours) return;
+    setPromoSaving(true);
+    try {
+      const r = await fetch("/api/promos", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branch_id: activeBranchId, name: promoName, buy_hours: parseFloat(promoBuyHours), free_hours: parseFloat(promoFreeHours), facility_category: promoCategory || null }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setPromos(prev => [...prev, d]);
+        setPromoName(""); setPromoBuyHours("2"); setPromoFreeHours("1"); setPromoCategory(""); setShowAddPromo(false);
+      } else { const d = await r.json(); alert(d.error); }
+    } catch { alert("Network error"); } finally { setPromoSaving(false); }
+  }, [activeBranchId, promoName, promoBuyHours, promoFreeHours, promoCategory]);
+
+  const handleTogglePromo = useCallback(async (id: string, current: boolean) => {
+    const r = await fetch(`/api/promos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !current }) });
+    if (r.ok) setPromos(prev => prev.map(p => p.id === id ? { ...p, is_active: !current } : p));
+  }, []);
+
+  const handleDeletePromo = useCallback(async (id: string) => {
+    if (!confirm("Hapus promo ini?")) return;
+    const r = await fetch(`/api/promos/${id}`, { method: "DELETE" });
+    if (r.ok) setPromos(prev => prev.filter(p => p.id !== id));
+  }, []);
+
   // ── Fasilitas Handlers ─────────────────────────────────────
   const handleAddFacility = useCallback(async () => {
     if (!newFacName || !newFacPrice) return; setLoadingAction("add-facility");
@@ -214,9 +262,26 @@ export default function PengaturanPage() {
     try { const r = await fetch(`/api/facilities/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: editFacName, price_per_hour: parseInt(editFacPrice), booth_number: editFacBooth || null }) }); if (r.ok) setEditingFacId(null); else { const d = await r.json(); alert(d.error); } } catch { alert("Network error"); } finally { setLoadingAction(null); }
   }, [editFacName, editFacPrice, editFacBooth]);
 
-  const handleDeleteFacility = useCallback(async (id: string, name: string) => {
-    if (!confirm(`Yakin ingin menghapus "${name}"?`)) return; setLoadingAction(id);
-    try { const r = await fetch(`/api/facilities/${id}`, { method: "DELETE" }); if (!r.ok) { const d = await r.json(); alert(d.error); } } catch { alert("Network error"); } finally { setLoadingAction(null); }
+  const handleDeleteFacility = useCallback(async (id: string, name: string, force = false) => {
+    if (!force && !confirm(`Yakin ingin menghapus "${name}"?`)) return;
+    setLoadingAction(id);
+    try {
+      const url = force ? `/api/facilities/${id}?force=true` : `/api/facilities/${id}`;
+      const r = await fetch(url, { method: "DELETE" });
+      if (!r.ok) {
+        const d = await r.json();
+        if (d.requiresForce) {
+          const ok = confirm(
+            `⚠️ "${name}" memiliki ${d.bookingCount} riwayat booking.\n\n` +
+            `Hapus semua? Seluruh riwayat sesi dan data pendapatan dari fasilitas ini akan hilang permanen.\n\n` +
+            `Klik OK untuk hapus paksa.`
+          );
+          if (ok) await handleDeleteFacility(id, name, true);
+        } else {
+          alert(d.error);
+        }
+      }
+    } catch { alert("Network error"); } finally { setLoadingAction(null); }
   }, []);
 
   const openEditDetail = (fac: Facility) => {
@@ -428,7 +493,7 @@ export default function PengaturanPage() {
           { key: "cabang", label: "Kelola Cabang", icon: <SvgBuilding /> },
           { key: "menu", label: "Kelola Menu", icon: <SvgChefHat /> },
           ...(isOwner ? [{ key: "staff", label: "Kelola Staff", icon: <SvgUsers /> }] : []),
-          ...(isOwner ? [{ key: "tools", label: "Power Tools", icon: <SvgZap /> }] : []),
+          ...(isOwner ? [{ key: "tools", label: "Promo & Tools", icon: <SvgWrench /> }] : []),
           ...(isOwner ? [{ key: "shifts", label: "Kelola Shift", icon: <SvgClock /> }] : []),
         ] as { key: "fasilitas" | "cabang" | "menu" | "staff" | "tools" | "shifts"; label: string; icon: React.ReactNode }[]).map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === tab.key ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/30 shadow-[0_0_12px_rgba(168,85,247,0.2)]" : "text-slate-400 hover:text-white"}`}>{tab.icon}{tab.label}</button>
@@ -824,6 +889,106 @@ export default function PengaturanPage() {
       {/* ══════════════════════════════════════════════════════
           TAB 5: POWER TOOLS (Owner only)
       ══════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════
+          TAB: KELOLA PROMO (Owner only)
+      ══════════════════════════════════════════════════════ */}
+      {activeTab === "tools" && isOwner && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-white">Kelola Promo</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Promo "beli X jam gratis Y jam" — harga tetap dihitung dari jam yang dibayar.</p>
+            </div>
+            <button onClick={() => setShowAddPromo(v => !v)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-neon-purple/20 border border-neon-purple/30 text-neon-purple text-sm font-bold hover:bg-neon-purple/30 transition-all">
+              <SvgPlus /> Tambah Promo
+            </button>
+          </div>
+
+          {/* Form tambah promo */}
+          {showAddPromo && (
+            <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-bold text-white">Promo Baru</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Nama Promo</label>
+                  <input value={promoName} onChange={e => setPromoName(e.target.value)} placeholder="contoh: Main 2 Jam Gratis 1 Jam"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-neon-purple/50 transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Jam Dibayar</label>
+                  <input type="number" min="0.5" step="0.5" value={promoBuyHours} onChange={e => setPromoBuyHours(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-neon-purple/50 transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Jam Gratis (Bonus)</label>
+                  <input type="number" min="0.5" step="0.5" value={promoFreeHours} onChange={e => setPromoFreeHours(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-neon-purple/50 transition-colors" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">Kategori Fasilitas <span className="text-slate-600 normal-case">(kosongkan = semua kategori)</span></label>
+                  <select value={promoCategory} onChange={e => setPromoCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-neon-purple/50 transition-colors appearance-none [&>option]:bg-slate-900">
+                    <option value="">— Semua Kategori —</option>
+                    {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              {promoName && promoBuyHours && promoFreeHours && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400">
+                  Preview: Bayar <b>{promoBuyHours} jam</b>, main <b>{parseFloat(promoBuyHours) + parseFloat(promoFreeHours || "0")} jam</b> — gratis <b>{promoFreeHours} jam</b>
+                </div>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => { setShowAddPromo(false); setPromoName(""); setPromoBuyHours("2"); setPromoFreeHours("1"); setPromoCategory(""); }}
+                  className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-800 transition-all">Batal</button>
+                <button onClick={handleAddPromo} disabled={!promoName || !promoBuyHours || !promoFreeHours || promoSaving}
+                  className="flex-[2] py-2 rounded-xl bg-neon-purple/20 border border-neon-purple/30 text-neon-purple text-sm font-bold hover:bg-neon-purple/30 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                  {promoSaving ? <><SvgLoader /> Menyimpan...</> : <><SvgCheck /> Simpan Promo</>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* List promo */}
+          {promoLoading ? (
+            <div className="flex items-center justify-center py-12 gap-3"><SvgLoader /><span className="text-sm text-slate-400">Memuat promo...</span></div>
+          ) : promos.length === 0 ? (
+            <div className="text-center py-12 text-slate-500 text-sm">Belum ada promo. Klik "Tambah Promo" untuk membuat promo pertama.</div>
+          ) : (
+            <div className="space-y-3">
+              {promos.map(p => (
+                <div key={p.id} className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${p.is_active ? "bg-slate-900/50 border-slate-700" : "bg-slate-900/20 border-slate-800 opacity-60"}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-white">{p.name}</p>
+                      {p.is_active
+                        ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">Aktif</span>
+                        : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-500 border border-slate-600 uppercase tracking-wider">Nonaktif</span>}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Bayar <span className="text-white font-semibold">{p.buy_hours} jam</span>
+                      {" · "}Gratis <span className="text-emerald-400 font-semibold">{p.free_hours} jam</span>
+                      {" · "}Total <span className="text-white font-semibold">{p.buy_hours + p.free_hours} jam</span>
+                      {p.facility_category && <span className="ml-2 px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">{p.facility_category}</span>}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => handleTogglePromo(p.id, p.is_active)} title={p.is_active ? "Nonaktifkan" : "Aktifkan"}
+                      className="p-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+                      {p.is_active ? <SvgEyeOff /> : <SvgEye />}
+                    </button>
+                    <button onClick={() => handleDeletePromo(p.id)} title="Hapus"
+                      className="p-2 rounded-lg border border-red-500/20 text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-all">
+                      <SvgTrash />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === "tools" && activeBranchId && (
         <PowerToolsTab branchId={activeBranchId} />
       )}
