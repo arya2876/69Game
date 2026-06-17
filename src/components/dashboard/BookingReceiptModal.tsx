@@ -88,25 +88,28 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 10px;
+      font-size: 11px;
+      font-weight: 700;
       color: #000;
       width: 52mm;
       margin: 0 auto;
       padding: 1mm 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .center     { text-align: center; }
     .logo       { display: block; width: 22mm; height: auto; margin: 0 auto -6.5mm; }
-    .sub        { position: relative; font-size: 8px; color: #444; margin-top: 0; }
-    .divider    { border: none; border-top: 1px dashed #888; margin: 2mm 0; }
-    .row        { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; }
-    .label      { color: #555; }
+    .sub        { position: relative; font-size: 9px; font-weight: 700; color: #000; margin-top: 0; }
+    .divider    { border: none; border-top: 1.5px solid #000; margin: 2mm 0; }
+    .row        { display: flex; justify-content: space-between; margin: 1mm 0; line-height: 1.4; font-weight: 700; }
+    .label      { color: #000; font-weight: 700; }
     table       { width: 100%; border-collapse: collapse; margin: 1mm 0; }
-    .item-name  { font-size: 10px; padding: 1.5mm 0; vertical-align: top; line-height: 1.4; }
-    .item-sub   { font-size: 8px; color: #555; }
-    .item-price { font-size: 10px; text-align: right; vertical-align: top; padding: 1.5mm 0; white-space: nowrap; }
-    .total-row  { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; margin: 2mm 0 1mm; }
-    .method     { display: inline-block; border: 1px solid #000; padding: 1mm 3mm; font-weight: 700; font-size: 10px; margin-top: 1mm; }
-    .footer     { font-size: 8px; color: #666; text-align: center; margin-top: 3mm; line-height: 1.6; }
+    .item-name  { font-size: 11px; font-weight: 700; padding: 1.5mm 0; vertical-align: top; line-height: 1.4; }
+    .item-sub   { font-size: 9px; font-weight: 700; color: #000; }
+    .item-price { font-size: 11px; font-weight: 700; text-align: right; vertical-align: top; padding: 1.5mm 0; white-space: nowrap; }
+    .total-row  { display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; margin: 2mm 0 1mm; }
+    .method     { display: inline-block; border: 2px solid #000; padding: 1mm 3mm; font-weight: 900; font-size: 11px; margin-top: 1mm; }
+    .footer     { font-size: 9px; font-weight: 700; color: #000; text-align: center; margin-top: 3mm; line-height: 1.6; }
     @media print { body { padding: 0; } }
   </style>
 </head>
