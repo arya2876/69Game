@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, category, price_per_hour, image_url } = body;
+    const { name, category, price_per_hour, image_url, booth_number } = body;
 
     if (!name || !category || !price_per_hour) {
       return NextResponse.json({ error: "name, category, price_per_hour required" }, { status: 400 });
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
         name,
         category,
         price_per_hour: Math.round(price_per_hour),
+        booth_number: booth_number || null,
         status: "available",
         image_url: image_url || null,
       })
