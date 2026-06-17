@@ -442,7 +442,7 @@ export default function PengaturanPage() {
         setNewMenuName(""); setNewMenuPrice(""); setNewMenuFnbCategory(""); setShowAddMenu(false);
       } else { const d = await r.json(); alert(d.error); }
     } catch { alert("Network error"); } finally { setLoadingAction(null); }
-  }, [newMenuName, newMenuCategory, newMenuPrice]);
+  }, [newMenuName, newMenuCategory, newMenuFnbCategory, newMenuPrice]);
 
   const handleUpdateMenu = useCallback(async (id: string) => {
     setLoadingAction(id);
@@ -458,7 +458,7 @@ export default function PengaturanPage() {
         setEditMenuId(null);
       } else { const d = await r.json(); alert(d.error); }
     } catch { alert("Network error"); } finally { setLoadingAction(null); }
-  }, [editMenuName, editMenuCategory, editMenuPrice]);
+  }, [editMenuName, editMenuCategory, editMenuFnbCategory, editMenuPrice]);
 
   const handleToggleMenuAvailability = useCallback(async (item: MenuItem) => {
     setLoadingAction(item.id);
