@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   ShoppingCart,
   Clock,
@@ -23,12 +24,17 @@ interface Facility {
   category: string;
   branch_id: string;
   status: string;
+  booth_number?: string | null;
+  price_per_hour?: number | null;
 }
 
 interface Booking {
   id: string;
   end_time: string;
   start_time: string;
+  is_open_session: boolean;
+  total_amount: number | null;
+  base_amount: number | null;
 }
 
 interface MenuItem {
@@ -101,22 +107,50 @@ function InactiveState({ facilityName }: { facilityName: string }) {
 
 // ── Live Countdown ────────────────────────────────────────────
 
-function LiveCountdown({ endTimeIso }: { endTimeIso: string }) {
-  const [remaining, setRemaining] = useState(0);
+function LiveCountdown({
+  endTimeIso,
+  startTimeIso,
+  isOpen,
+}: {
+  endTimeIso: string;
+  startTimeIso: string;
+  isOpen: boolean;
+}) {
+  const [value, setValue] = useState(0);
 
   useEffect(() => {
-    const endMs = new Date(endTimeIso).getTime();
-    const tick = () => setRemaining(Math.max(0, endMs - Date.now()));
-    const t0 = setTimeout(tick, 0);
-    const interval = setInterval(tick, 1000);
-    return () => { clearTimeout(t0); clearInterval(interval); };
-  }, [endTimeIso]);
+    if (isOpen) {
+      const startMs = new Date(startTimeIso).getTime();
+      const tick = () => setValue(Date.now() - startMs);
+      tick();
+      const interval = setInterval(tick, 1000);
+      return () => clearInterval(interval);
+    } else {
+      const endMs = new Date(endTimeIso).getTime();
+      const tick = () => setValue(Math.max(0, endMs - Date.now()));
+      tick();
+      const interval = setInterval(tick, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [endTimeIso, startTimeIso, isOpen]);
 
-  const h = Math.floor(remaining / 3_600_000);
-  const m = Math.floor((remaining % 3_600_000) / 60_000);
-  const s = Math.floor((remaining % 60_000) / 1_000);
-  const isLow = remaining < 10 * 60 * 1000 && remaining > 0;
-  const isDone = remaining === 0;
+  const h = Math.floor(value / 3_600_000);
+  const m = Math.floor((value % 3_600_000) / 60_000);
+  const s = Math.floor((value % 60_000) / 1_000);
+
+  if (isOpen) {
+    return (
+      <div className="text-center">
+        <div className="font-mono text-5xl font-black tracking-[0.15em] tabular-nums text-white drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]">
+          {padTwo(h)}:{padTwo(m)}:{padTwo(s)}
+        </div>
+        <p className="text-xs mt-1.5 font-medium text-neon-blue">Sesi open berjalan</p>
+      </div>
+    );
+  }
+
+  const isLow = value < 10 * 60 * 1000 && value > 0;
+  const isDone = value === 0;
 
   return (
     <div className="text-center">
@@ -340,6 +374,7 @@ function ChatSentScreen({ onReset }: { onReset: () => void }) {
 // ── Main Component ────────────────────────────────────────────
 
 export default function CustomerOrderPage({ facility, booking, menuItems }: Props) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"menu" | "chat">("menu");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -349,6 +384,43 @@ export default function CustomerOrderPage({ facility, booking, menuItems }: Prop
   const [chatSubmitting, setChatSubmitting] = useState(false);
   const [chatSent, setChatSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [displayTotal, setDisplayTotal] = useState<number>(booking?.total_amount ?? 0);
+  const [liveTimeCost, setLiveTimeCost] = useState<number>(0);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // For open sessions: calculate live time cost every second
+  useEffect(() => {
+    if (!booking) return;
+    const durationMs = new Date(booking.end_time).getTime() - new Date(booking.start_time).getTime();
+    const isOpen = Boolean(booking.is_open_session) || durationMs >= 23 * 60 * 60 * 1000;
+    if (!isOpen || !facility.price_per_hour) return;
+
+    const pricePerHour = facility.price_per_hour;
+    const startMs = new Date(booking.start_time).getTime();
+    const tick = () => {
+      const elapsedMs = Date.now() - startMs;
+      setLiveTimeCost(Math.round((elapsedMs / 3_600_000) * pricePerHour));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [booking, facility.price_per_hour]);
+
+  // Fetch live F&B total from server every 30s
+  useEffect(() => {
+    if (!booking) return;
+    const refresh = async () => {
+      try {
+        const res = await fetch(`/api/bookings/${booking.id}/total`);
+        if (res.ok) {
+          const data = await res.json();
+          setDisplayTotal(data.total_amount ?? 0);
+        }
+      } catch {}
+    };
+    refreshIntervalRef.current = setInterval(refresh, 30_000);
+    return () => { if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current); };
+  }, [booking]);
 
   // useCallback must be unconditional — declared before any early return
   const handleSubmit = useCallback(async () => {
@@ -371,6 +443,7 @@ export default function CustomerOrderPage({ facility, booking, menuItems }: Prop
       }
       setSubmitted(true);
       setCartOpen(false);
+      router.refresh();
     } catch {
       setError("Tidak dapat terhubung ke server. Coba lagi.");
     } finally {
@@ -452,15 +525,53 @@ export default function CustomerOrderPage({ facility, booking, menuItems }: Prop
             Sesi Aktif
           </div>
           <h1 className="text-xl font-bold text-white mb-1">{facility.name}</h1>
+          {facility.booth_number && (
+            <p className="text-sm font-bold text-neon-purple mb-1">{facility.booth_number}</p>
+          )}
           <p className="text-xs text-slate-500 mb-6 uppercase tracking-wider font-semibold">{facility.category}</p>
 
-          {/* Countdown */}
+          {/* Total Pengeluaran */}
+          {(() => {
+            const durationMs = new Date(booking.end_time).getTime() - new Date(booking.start_time).getTime();
+            const isOpenSession = Boolean(booking.is_open_session) || durationMs >= 23 * 60 * 60 * 1000;
+            const total = isOpenSession ? liveTimeCost + displayTotal : displayTotal;
+            return (
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="bg-slate-900/60 border border-white/10 rounded-xl px-5 py-3 text-center">
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Total Tagihan</p>
+                  <p className="text-lg font-black text-white tabular-nums">
+                    {isOpenSession && <span className="text-slate-400 font-normal mr-0.5">~</span>}
+                    {formatRupiah(total)}
+                  </p>
+                  {isOpenSession && displayTotal > 0 && (
+                    <p className="text-[10px] text-slate-600 mt-0.5">termasuk F&B {formatRupiah(displayTotal)}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Countdown — open session detected by flag OR 24h sentinel */}
           <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-2xl py-6 px-8 inline-block">
-            <div className="flex items-center justify-center gap-2 mb-3 text-slate-500">
-              <Clock className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Sisa Waktu</span>
-            </div>
-            <LiveCountdown endTimeIso={booking.end_time} />
+            {(() => {
+              const durationMs = new Date(booking.end_time).getTime() - new Date(booking.start_time).getTime();
+              const isOpen = Boolean(booking.is_open_session) || durationMs >= 23 * 60 * 60 * 1000;
+              return (
+                <>
+                  <div className="flex items-center justify-center gap-2 mb-3 text-slate-500">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                      {isOpen ? "Waktu Berjalan" : "Sisa Waktu"}
+                    </span>
+                  </div>
+                  <LiveCountdown
+                    endTimeIso={booking.end_time}
+                    startTimeIso={booking.start_time}
+                    isOpen={isOpen}
+                  />
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

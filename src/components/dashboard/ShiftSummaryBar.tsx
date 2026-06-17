@@ -8,6 +8,13 @@ interface BucketData {
   count: number;
 }
 
+interface PaymentSplit {
+  method1: string;
+  amount1: number;
+  method2: string;
+  amount2: number;
+}
+
 interface Props {
   branchId: string | null;
   shiftId?: string | null; // cashier: filter by shift; owner: filter by today
@@ -39,7 +46,7 @@ export default function ShiftSummaryBar({ branchId, shiftId }: Props) {
     const supabase = createClient();
     let query = supabase
       .from("bookings")
-      .select("payment_method, total_amount")
+      .select("payment_method, payment_split, total_amount")
       .eq("branch_id", branchId)
       .eq("status", "completed")
       .eq("is_paid", true);
@@ -65,9 +72,20 @@ export default function ShiftSummaryBar({ branchId, shiftId }: Props) {
       };
 
       for (const row of data) {
-        const key = normalizeBucket(row.payment_method);
-        buckets[key].total += row.total_amount ?? 0;
-        buckets[key].count += 1;
+        const split = row.payment_split as PaymentSplit | null;
+        if (split && split.method1 && split.method2) {
+          // Split bill: distribute each portion to its bucket
+          const k1 = normalizeBucket(split.method1);
+          buckets[k1].total += split.amount1 ?? 0;
+          buckets[k1].count += 1;
+          const k2 = normalizeBucket(split.method2);
+          buckets[k2].total += split.amount2 ?? 0;
+          buckets[k2].count += 1;
+        } else {
+          const key = normalizeBucket(row.payment_method);
+          buckets[key].total += row.total_amount ?? 0;
+          buckets[key].count += 1;
+        }
       }
 
       setCash(buckets.CASH);
