@@ -166,7 +166,7 @@ export async function processCashierBooking(params: {
   return { success: true, bookingId, memberCreated, isGuest: !hasWa };
 }
 
-export async function endSessionAndSaveTime(bookingId: string) {
+export async function endSessionAndSaveTime(bookingId: string, paymentMethod?: string, splitAmount1?: number) {
   const cookieStore = await cookies();
   
   const supabase = createServerClient(
@@ -195,6 +195,20 @@ export async function endSessionAndSaveTime(bookingId: string) {
   if (rpcError) {
     console.error("End Session Error:", rpcError);
     throw new Error(`Gagal menghentikan sesi: ${rpcError.message}`);
+  }
+
+  if (paymentMethod) {
+    const isSplit = paymentMethod.includes("+");
+    let paymentSplit = null;
+    if (isSplit && splitAmount1 != null) {
+      const { data: bk } = await supabase.from("bookings").select("total_amount").eq("id", bookingId).single();
+      const [m1, m2] = paymentMethod.split("+");
+      paymentSplit = { method1: m1, amount1: splitAmount1, method2: m2, amount2: (bk?.total_amount ?? 0) - splitAmount1 };
+    }
+    await supabase.from("bookings").update({
+      payment_method: paymentMethod,
+      ...(paymentSplit ? { payment_split: paymentSplit } : {}),
+    } as never).eq("id", bookingId);
   }
 
   return { success: true, refundedMinutes };

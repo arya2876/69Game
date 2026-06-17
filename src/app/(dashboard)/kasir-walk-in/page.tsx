@@ -49,6 +49,7 @@ function formatElapsed(ms: number): string {
 }
 
 interface BookingWithDetails extends Booking {
+  guest_name?: string | null;
   member?: { full_name: string; whatsapp: string | null } | null;
   facility?: { name: string; category: string; price_per_hour: number } | null;
 }
@@ -173,7 +174,7 @@ function AddMenuModal({
 // ── LIVE ROOM CARD ──────────────────────────────────────────
 function RoomCard({ facility, activeBooking, nextBooking, now, onQuickBook, onEndSession, onStartEarly, onStartNext, onAddMenu, actionLoading }: {
   facility: Facility; activeBooking?: BookingWithDetails; nextBooking?: BookingWithDetails; now: number;
-  onQuickBook: (id: string) => void; onEndSession: (id: string) => void; onStartEarly: (id: string) => void; onStartNext: (id: string) => void;
+  onQuickBook: (id: string) => void; onEndSession: (id: string, pm: string, split1?: number) => void; onStartEarly: (id: string) => void; onStartNext: (id: string) => void;
   onAddMenu: (bookingId: string, facilityName: string) => void; actionLoading: string | null;
 }) {
   const isActive = facility.status === "active";
@@ -190,9 +191,18 @@ function RoomCard({ facility, activeBooking, nextBooking, now, onQuickBook, onEn
     ? Math.round((Math.ceil(elapsed / 60_000) / 60) * (activeBooking.facility?.price_per_hour ?? 0))
     : 0;
   const hasUpcoming = facility.status === "available" && nextBooking;
-  const customerName = activeBooking?.member?.full_name || "Walk-in";
+  const customerName = activeBooking?.member?.full_name || activeBooking?.guest_name || "Walk-in";
   const customerWa = activeBooking?.member?.whatsapp;
   const waitingCustomer = isWaitingNext && nextBooking ? nextBooking.member?.full_name || "Pelanggan" : null;
+
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [coMethod, setCoMethod] = useState<"Cash" | "QRIS" | "Cash+Cash" | "Cash+QRIS" | "QRIS+QRIS">("Cash");
+  const [coSplit1, setCoSplit1] = useState(0);
+  const coIsSplit = coMethod.includes("+");
+  const coTotal = isOpen ? openEstimate : (activeBooking?.total_amount ?? 0);
+  const coSplit2 = coIsSplit ? coTotal - coSplit1 : 0;
+
+  const resetCheckout = () => { setCheckingOut(false); setCoMethod("Cash"); setCoSplit1(0); };
 
   if (isMaintenance) {
     return (
@@ -265,17 +275,66 @@ function RoomCard({ facility, activeBooking, nextBooking, now, onQuickBook, onEn
               </span>
             </div>
           )}
-          <div className="flex gap-2">
-            <button
-              onClick={() => onAddMenu(activeBooking.id, facility.name)}
-              className="flex-shrink-0 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-neon-purple/10 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple/20 transition-all"
-            >
-              <SvgZap />F&amp;B
-            </button>
-            <button onClick={() => onEndSession(activeBooking.id)} disabled={actionLoading === activeBooking.id} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all disabled:opacity-50">
-              {actionLoading === activeBooking.id ? <SvgLoader /> : <SvgSave />} {isOpen ? "Checkout" : "Selesai"}
-            </button>
-          </div>
+          {!checkingOut ? (
+            <div className="flex gap-2">
+              <button onClick={() => onAddMenu(activeBooking.id, facility.name)}
+                className="flex-shrink-0 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-neon-purple/10 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple/20 transition-all">
+                <SvgZap />F&amp;B
+              </button>
+              <button onClick={() => setCheckingOut(true)} disabled={actionLoading === activeBooking.id}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all disabled:opacity-50">
+                <SvgSave /> {isOpen ? "Checkout" : "Selesai"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                {(["Cash", "QRIS"] as const).map(m => (
+                  <button key={m} type="button" onClick={() => { setCoMethod(m); setCoSplit1(0); }}
+                    className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all ${coMethod === m ? "bg-neon-purple/20 text-neon-purple border-neon-purple/40" : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"}`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["Cash+Cash", "Cash+QRIS", "QRIS+QRIS"] as const).map(m => (
+                  <button key={m} type="button" onClick={() => { setCoMethod(m); setCoSplit1(Math.floor(coTotal / 2)); }}
+                    className={`py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${coMethod === m ? "bg-neon-blue/20 text-neon-blue border-neon-blue/40" : "bg-slate-900 text-slate-400 border-slate-700 hover:text-white"}`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+              {coIsSplit && (
+                <div className="p-2 bg-neon-blue/5 border border-neon-blue/20 rounded-lg space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold w-16">{coMethod.split("+")[0]}</span>
+                    <input type="number" min="0" step="1000" value={coSplit1}
+                      onChange={e => setCoSplit1(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-28 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white text-right outline-none font-mono focus:border-neon-blue/50" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-semibold w-16">{coMethod.split("+")[1]}</span>
+                    <span className="text-xs font-mono font-bold text-slate-300">Rp {coSplit2.toLocaleString("id-ID")}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={resetCheckout}
+                  className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-all">
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    onEndSession(activeBooking.id, coMethod, coIsSplit ? coSplit1 : undefined);
+                    resetCheckout();
+                  }}
+                  disabled={actionLoading === activeBooking.id || (coIsSplit && coSplit1 <= 0)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all disabled:opacity-50">
+                  {actionLoading === activeBooking.id ? <SvgLoader /> : <SvgSave />} Konfirmasi
+                </button>
+              </div>
+            </div>
+          )}
         </>
       ) : isWaitingNext ? (
         <>
@@ -501,10 +560,10 @@ export default function KasirWalkInPage() {
     finally { setActionLoading(null); }
   }, []);
 
-  const handleEndSession = useCallback(async (bookingId: string) => {
+  const handleEndSession = useCallback(async (bookingId: string, pm = "Cash", split1?: number) => {
     setActionLoading(bookingId);
     try {
-      const res = await endSessionAndSaveTime(bookingId);
+      const res = await endSessionAndSaveTime(bookingId, pm, split1);
       if (res.success) {
         if (res.refundedMinutes > 0) alert(`✅ Sesi dihentikan!\n\n${res.refundedMinutes} menit disimpan ke deposit waktu member.`);
         else alert("✅ Sesi selesai.");
