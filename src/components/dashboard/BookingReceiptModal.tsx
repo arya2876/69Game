@@ -58,8 +58,6 @@ function fmtDuration(startIso: string, endIso: string, isOpen = false) {
 // ── Print Receipt ────────────────────────────────────────────
 
 function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTotal: number, bayar = 0) {
-  const w = window.open("", "_blank");
-  if (!w) { alert("Izinkan popup untuk mencetak struk."); return; }
 
   const facilityName  = booking.facility?.name ?? "Unknown";
   const customerName  = booking.member?.full_name ?? booking.guest_name ?? "Tamu";
@@ -152,13 +150,19 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
     Sampai jumpa lagi &amp; jangan lupa datang kembali!
   </div>
 
-  <script>window.onload = function() { window.focus(); window.print(); }</script>
 </body>
 </html>`;
 
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  // Gunakan hidden iframe agar tidak perlu popup (popup diblokir browser di production)
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;";
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) { document.body.removeChild(iframe); return; }
+  doc.open(); doc.write(html); doc.close();
+  iframe.contentWindow?.focus();
+  iframe.contentWindow?.print();
+  setTimeout(() => { document.body.removeChild(iframe); }, 1000);
 }
 
 // ── Main Modal ───────────────────────────────────────────────
