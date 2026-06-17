@@ -401,7 +401,7 @@ export default function BookingAktifPage() {
     return {
       rawId: raw.id,
       displayId: raw.id.slice(0, 8).toUpperCase(),
-      customer: b.member?.full_name || "Walk-in Guest",
+      customer: b.member?.full_name || b.guest_name || "Tamu",
       whatsapp: b.member?.whatsapp || "-",
       facility: b.facility?.name || "Unknown",
       boothNumber: b.facility?.booth_number ?? null,

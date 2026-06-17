@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Booking } from "@/lib/types/database";
 
 interface BookingWithProfile extends Booking {
+  guest_name?: string | null;
   member?: {
     full_name: string;
     whatsapp: string | null;
@@ -41,7 +42,7 @@ export function useRealtimeBookings(
       let query = supabase
         .from("bookings")
         .select(`
-          *,
+          *, guest_name,
           member:profiles!bookings_member_id_fkey(full_name, whatsapp),
           facility:facilities!bookings_facility_id_fkey(name, category, price_per_hour, booth_number)
         `)

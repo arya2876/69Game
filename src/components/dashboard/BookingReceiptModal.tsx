@@ -15,6 +15,7 @@ interface BookingDetail {
   end_time: string;
   is_open_session: boolean;
   created_at: string;
+  guest_name?: string | null;
   member: { full_name: string } | null;
   facility: { name: string; category: string } | null;
   cashier: { full_name: string } | null;
@@ -61,7 +62,7 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
   if (!w) { alert("Izinkan popup untuk mencetak struk."); return; }
 
   const facilityName  = booking.facility?.name ?? "Unknown";
-  const customerName  = booking.member?.full_name ?? "Walk-in Guest";
+  const customerName  = booking.member?.full_name ?? booking.guest_name ?? "Tamu";
   const cashierName   = booking.cashier?.full_name ?? "—";
   const duration      = fmtDuration(booking.start_time, booking.end_time, booking.is_open_session);
   const bookingId     = booking.id.slice(0, 8).toUpperCase();

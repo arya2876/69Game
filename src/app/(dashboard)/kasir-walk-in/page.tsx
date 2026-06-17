@@ -449,7 +449,7 @@ export default function KasirWalkInPage() {
     : basePaidAmount;
 
   const handleSubmit = useCallback(async () => {
-    if (!customerName || !customerWa || !selectedFacility || selectedDuration === null || isRoomActive || !activeBranchId) return;
+    if (!customerName || !selectedFacility || selectedDuration === null || isRoomActive || !activeBranchId) return;
     if (!isOpenSession && maxDurationMinutes === 0) return;
     setSubmitLoading(true); setSubmitError(null); setSubmitSuccess(null);
     try {
@@ -592,12 +592,12 @@ export default function KasirWalkInPage() {
               {/* Member Auto Search Input */}
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  Nomor WhatsApp
+                  Nomor WhatsApp <span className="text-slate-600 normal-case font-normal">(opsional)</span>
                   {memberLoading && <SvgLoader />}
                 </label>
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 focus-within:border-neon-purple/50 transition-colors">
                   <SvgPhone />
-                  <input type="tel" placeholder="08xxxxxxxxxx" value={customerWa} onChange={e => setCustomerWa(e.target.value)} className="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-slate-600" />
+                  <input type="tel" placeholder="08xxxxxxxxxx (opsional)" value={customerWa} onChange={e => setCustomerWa(e.target.value)} className="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-slate-600" />
                 </div>
                 {foundMember && <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1"><SvgCheck /> Member terdeteksi.</p>}
                 {!foundMember && customerWa.length >= 10 && !memberLoading && <p className="text-[10px] text-neon-blue mt-1">Bukan member. Akun baru akan otomatis dibuat.</p>}
@@ -713,7 +713,7 @@ export default function KasirWalkInPage() {
                     </div>
                   ) : (
                     <>
-                      {availableDeposit > 0 && (
+                      {availableDeposit > 0 && customerWa.length >= 10 && (
                         <div className="p-3 bg-neon-purple/10 border border-neon-purple/30 rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <label className="text-xs font-semibold text-neon-purple uppercase tracking-wider">Pakai Deposit</label>
@@ -798,9 +798,9 @@ export default function KasirWalkInPage() {
               
               <button
                 onClick={handleSubmit}
-                disabled={!customerName || !customerWa || !selectedFacility || selectedDuration === null || (!isOpenSession && maxDurationMinutes === 0) || isRoomActive || submitLoading}
+                disabled={!customerName || !selectedFacility || selectedDuration === null || (!isOpenSession && maxDurationMinutes === 0) || isRoomActive || submitLoading}
                 className={`w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 ${
-                  !customerName || !customerWa || !selectedFacility || selectedDuration === null || (!isOpenSession && maxDurationMinutes === 0) || isRoomActive || submitLoading
+                  !customerName || !selectedFacility || selectedDuration === null || (!isOpenSession && maxDurationMinutes === 0) || isRoomActive || submitLoading
                     ? "bg-slate-800 text-slate-600 cursor-not-allowed"
                     : "bg-gradient-to-r from-neon-purple to-neon-blue text-white hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] hover:scale-[1.02] active:scale-[0.98]"
                 }`}

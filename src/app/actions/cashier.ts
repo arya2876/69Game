@@ -35,58 +35,50 @@ export async function processCashierBooking(params: {
 
   // Clean WA number (only digits)
   const formattedWa = params.customerWa.replace(/\D/g, "");
-  
+  const hasWa = formattedWa.length >= 10;
+
   let targetMemberId: string | null = null;
+  let memberCreated = false;
+  let existingProfile: { id: string } | null = null;
+  let bookingId: string | null = null;
 
-  // 1. Search for existing member by WA
-  const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("whatsapp", formattedWa)
-    .single();
+  if (hasWa) {
+    // ── Member path: WA provided ──────────────────────────────
+    const { data: found } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("whatsapp", formattedWa)
+      .single();
 
-  if (existingProfile) {
-    targetMemberId = existingProfile.id;
-  } else {
-    // 2. Auto Create Member using Service Role Key
-    const adminAuthClient = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    if (found) {
+      targetMemberId = found.id;
+      existingProfile = found;
+    } else {
+      // Auto-create member
+      const adminAuthClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
 
-    const fakeEmail = `${formattedWa}@member.69game.id`;
-    
-    const { data: newUser, error: createError } = await adminAuthClient.auth.admin.createUser({
-      email: fakeEmail,
-      password: formattedWa,
-      email_confirm: true,
-      user_metadata: {
-        full_name: params.customerName,
-        whatsapp: formattedWa,
-        role: "member"
+      const { data: newUser, error: createError } = await adminAuthClient.auth.admin.createUser({
+        email: `${formattedWa}@member.69game.id`,
+        password: formattedWa,
+        email_confirm: true,
+        user_metadata: { full_name: params.customerName, whatsapp: formattedWa, role: "member" },
+      });
+
+      if (createError || !newUser.user) {
+        throw new Error(`Gagal membuat member otomatis: ${createError?.message ?? "unknown"}`);
       }
-    });
 
-    if (createError) {
-      console.error("Auto member creation failed:", createError);
-      throw new Error(`Gagal membuat member otomatis: ${createError.message}`);
-    }
-    
-    if (!newUser.user) {
-      throw new Error("User creation failed without error message.");
+      targetMemberId = newUser.user.id;
+      memberCreated = true;
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    targetMemberId = newUser.user.id;
-    
-    // Give postgres trigger a brief moment to create the profile row
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-
-  // 3. Create Booking
-  const { data: bookingId, error: rpcError } = await supabase.rpc(
-    "create_booking_with_deposit",
-    {
+    // Create booking via RPC (handles deposit deduction)
+    const { data: rpcId, error: rpcError } = await supabase.rpc("create_booking_with_deposit", {
       p_branch_id: params.branchId,
       p_facility_id: params.facilityId,
       p_member_id: targetMemberId,
@@ -95,18 +87,55 @@ export async function processCashierBooking(params: {
       p_paid_amount: params.paidAmount,
       p_start_time: new Date().toISOString(),
       p_payment_method: params.paymentMethod,
-    }
-  );
+    });
 
-  if (rpcError) {
-    console.error("RPC Booking Error:", rpcError);
-    if (rpcError.message.includes("mencukupi")) {
-      throw new Error(rpcError.message);
+    if (rpcError) {
+      if (rpcError.message.includes("mencukupi")) throw new Error(rpcError.message);
+      throw new Error(`Gagal memproses pemesanan: ${rpcError.message}`);
     }
-    throw new Error(`Gagal memproses pemesanan: ${rpcError.message}`);
+
+    bookingId = rpcId;
+  } else {
+    // ── Guest path: no WA provided ────────────────────────────
+    const adminClient = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const now = new Date();
+    const endTime = params.durationMinutes > 0
+      ? new Date(now.getTime() + params.durationMinutes * 60 * 1000).toISOString()
+      : new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(); // 24h sentinel for open session
+
+    const { data: newBooking, error: insertError } = await adminClient
+      .from("bookings")
+      .insert({
+        branch_id: params.branchId,
+        facility_id: params.facilityId,
+        member_id: null,
+        guest_name: params.customerName,
+        created_by: user.id,
+        start_time: now.toISOString(),
+        end_time: endTime,
+        status: "scheduled",
+        base_amount: params.paidAmount,
+        total_amount: params.paidAmount,
+        payment_method: params.paymentMethod ?? "Cash",
+        is_paid: params.paidAmount > 0,
+        is_open_session: params.durationMinutes === 0,
+      } as never)
+      .select("id")
+      .single();
+
+    if (insertError || !newBooking) {
+      throw new Error(`Gagal membuat booking tamu: ${insertError?.message ?? "unknown"}`);
+    }
+
+    bookingId = newBooking.id;
   }
 
-  // Attach active shift_id to the newly created booking (cashier only)
+  // Attach active shift_id (cashier only)
   if (bookingId) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
     if (profile?.role === "cashier") {
@@ -122,7 +151,7 @@ export async function processCashierBooking(params: {
     }
   }
 
-  return { success: true, bookingId, memberCreated: !existingProfile };
+  return { success: true, bookingId, memberCreated, isGuest: !hasWa };
 }
 
 export async function endSessionAndSaveTime(bookingId: string) {
