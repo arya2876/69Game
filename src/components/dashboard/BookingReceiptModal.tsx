@@ -6,11 +6,19 @@ import { createClient } from "@/lib/supabase/client";
 
 // ── Types ────────────────────────────────────────────────────
 
+interface PaymentSplit {
+  method1: string;
+  amount1: number;
+  method2: string;
+  amount2: number;
+}
+
 interface BookingDetail {
   id: string;
   base_amount: number;
   total_amount: number;
   payment_method: string | null;
+  payment_split?: PaymentSplit | null;
   start_time: string;
   end_time: string;
   is_open_session: boolean;
@@ -144,7 +152,12 @@ function printReceipt(booking: BookingDetail, items: OrderItemDetail[], grandTot
   <div class="row" style="margin-top:1.5mm"><span class="label">Bayar</span><span>${fmt(bayar)}</span></div>
   <div class="row kembali"><span><b>Kembali</b></span><span><b>${fmt(Math.max(0, bayar - grandTotal))}</b></span></div>
   ` : ""}
-  ${booking.payment_method ? `<div class="center"><span class="method">${booking.payment_method}</span></div>` : ""}
+  ${booking.payment_split
+    ? `<div class="row"><span class="label">${booking.payment_split.method1}</span><span>${fmt(booking.payment_split.amount1)}</span></div>
+  <div class="row"><span class="label">${booking.payment_split.method2}</span><span>${fmt(booking.payment_split.amount2)}</span></div>`
+    : booking.payment_method
+      ? `<div class="center"><span class="method">${booking.payment_method}</span></div>`
+      : ""}
 
   <hr class="divider">
 
@@ -186,7 +199,8 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
         supabase
           .from("bookings")
           .select(`
-            id, base_amount, total_amount, payment_method, start_time, end_time, is_open_session, created_at,
+            id, base_amount, total_amount, payment_method, payment_split, start_time, end_time, is_open_session, created_at,
+            guest_name,
             member:profiles!bookings_member_id_fkey(full_name),
             facility:facilities!bookings_facility_id_fkey(name, category),
             cashier:profiles!bookings_created_by_fkey(full_name)
@@ -281,11 +295,20 @@ export default function BookingReceiptModal({ isOpen, bookingId, onClose }: Prop
                         <p className="text-base font-bold text-white">{facilityName}</p>
                         <p className="text-sm text-neon-purple font-semibold mt-0.5">{customerName}</p>
                       </div>
-                      {booking.payment_method && (
+                      {booking.payment_split ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${paymentColor[booking.payment_split.method1] ?? "bg-slate-800 text-slate-300 border-slate-600"}`}>
+                            {booking.payment_split.method1} {fmt(booking.payment_split.amount1)}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${paymentColor[booking.payment_split.method2] ?? "bg-slate-800 text-slate-300 border-slate-600"}`}>
+                            {booking.payment_split.method2} {fmt(booking.payment_split.amount2)}
+                          </span>
+                        </div>
+                      ) : booking.payment_method ? (
                         <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${paymentColor[booking.payment_method] ?? "bg-slate-800 text-slate-300 border-slate-600"}`}>
                           {booking.payment_method}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 border-t border-slate-700/60 text-xs">
                       <div className="text-slate-500">Durasi</div>

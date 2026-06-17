@@ -326,7 +326,9 @@ export default function KasirWalkInPage() {
   const [customHours, setCustomHours] = useState(0);
   const [customMinutes, setCustomMinutes] = useState(30);
   const [useDepositMinutes, setUseDepositMinutes] = useState(0);
-  
+  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "QRIS" | "Cash+Cash" | "Cash+QRIS" | "QRIS+QRIS">("Cash");
+  const [splitAmount1, setSplitAmount1] = useState<number>(0);
+
   // Status State
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -408,7 +410,7 @@ export default function KasirWalkInPage() {
   }, [customerWa, supabase]);
 
   // Derived Values
-  const availableDeposit = selectedRoom 
+  const availableDeposit = selectedRoom
     ? memberBalances.find(b => b.facility_category === selectedRoom.category)?.balance_minutes || 0 
     : 0;
 
@@ -448,9 +450,16 @@ export default function KasirWalkInPage() {
       : Math.max(0, basePaidAmount - activePromo.discount_value)
     : basePaidAmount;
 
+  const isSplitMethod = paymentMethod.includes("+");
+  const splitAmount2 = isSplitMethod ? paidAmount - splitAmount1 : 0;
+
   const handleSubmit = useCallback(async () => {
     if (!customerName || !selectedFacility || selectedDuration === null || isRoomActive || !activeBranchId) return;
     if (!isOpenSession && maxDurationMinutes === 0) return;
+    if (isSplitMethod && (splitAmount1 <= 0 || splitAmount1 >= paidAmount)) {
+      setSubmitError("Jumlah split tidak valid. Pastikan setiap metode > 0.");
+      return;
+    }
     setSubmitLoading(true); setSubmitError(null); setSubmitSuccess(null);
     try {
       const res = await processCashierBooking({
@@ -458,23 +467,25 @@ export default function KasirWalkInPage() {
         facilityId: selectedFacility,
         customerName,
         customerWa,
-        durationMinutes: totalDurationMinutes, // includes free bonus hours
+        durationMinutes: totalDurationMinutes,
         useDepositMinutes,
         paidAmount,
-        paymentMethod: "Cash"
+        paymentMethod,
+        splitAmount1: isSplitMethod ? splitAmount1 : undefined,
       });
-      
+
       if (res.success) {
         setCustomerName(""); setCustomerWa(""); setSelectedFacility(""); setSelectedDuration(null); setUseDepositMinutes(0);
+        setPaymentMethod("Cash"); setSplitAmount1(0);
         setSubmitSuccess(res.memberCreated ? "Booking sukses! Akun member otomatis dibuat (Password = Nomor WA)." : "Booking sukses diproses!");
         setTimeout(() => setSubmitSuccess(null), 5000);
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Network error");
-    } finally { 
-      setSubmitLoading(false); 
+    } finally {
+      setSubmitLoading(false);
     }
-  }, [activeBranchId, customerName, customerWa, selectedFacility, selectedDuration, isRoomActive, isOpenSession, maxDurationMinutes, totalDurationMinutes, useDepositMinutes, paidAmount]);
+  }, [activeBranchId, customerName, customerWa, selectedFacility, selectedDuration, isRoomActive, isOpenSession, maxDurationMinutes, totalDurationMinutes, useDepositMinutes, paidAmount, paymentMethod, isSplitMethod, splitAmount1]);
 
   const handleQuickBook = useCallback((id: string) => { setSelectedFacility(id); setSelectedDuration(null); document.getElementById("booking-form")?.scrollIntoView({ behavior: "smooth" }); }, []);
 
@@ -792,6 +803,60 @@ export default function KasirWalkInPage() {
                   )}
                 </div>
               )}
+
+              {/* Payment Method Selector */}
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Metode Bayar</label>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  {(["Cash", "QRIS"] as const).map(m => (
+                    <button key={m} type="button" onClick={() => setPaymentMethod(m)}
+                      className={`py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all ${
+                        paymentMethod === m
+                          ? "bg-neon-purple/20 text-neon-purple border-neon-purple/40 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                          : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-600 hover:text-white"
+                      }`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                {!isOpenSession && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["Cash+Cash", "Cash+QRIS", "QRIS+QRIS"] as const).map(m => (
+                      <button key={m} type="button"
+                        onClick={() => { setPaymentMethod(m); setSplitAmount1(Math.floor(paidAmount / 2)); }}
+                        className={`py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                          paymentMethod === m
+                            ? "bg-neon-blue/20 text-neon-blue border-neon-blue/40 shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                            : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-600 hover:text-white"
+                        }`}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {isSplitMethod && !isOpenSession && (
+                  <div className="mt-2 p-3 bg-neon-blue/5 border border-neon-blue/20 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-semibold w-20">{paymentMethod.split("+")[0]}</span>
+                      <input
+                        type="number" min="0" max={paidAmount} step="1000"
+                        value={splitAmount1}
+                        onChange={e => setSplitAmount1(Math.max(0, Math.min(paidAmount, parseInt(e.target.value) || 0)))}
+                        className="w-36 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-white text-right outline-none font-mono focus:border-neon-blue/50"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-semibold w-20">{paymentMethod.split("+")[1]}</span>
+                      <span className="text-sm font-mono font-bold text-slate-300">
+                        Rp {splitAmount2.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                    {splitAmount2 < 0 && (
+                      <p className="text-[10px] text-red-400">Jumlah melebihi total</p>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {submitError && <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg"><span className="text-red-400"><SvgWarn /></span><span className="text-xs text-red-400 font-medium">{submitError}</span></div>}
               {submitSuccess && <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg"><span className="text-emerald-400"><SvgCheck /></span><span className="text-xs text-emerald-400 font-medium">{submitSuccess}</span></div>}

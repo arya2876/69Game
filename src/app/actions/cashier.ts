@@ -13,9 +13,16 @@ export async function processCashierBooking(params: {
   useDepositMinutes: number;
   paidAmount: number;
   paymentMethod: string;
+  splitAmount1?: number;
 }) {
+  const isSplit = params.paymentMethod.includes("+");
+  const paymentSplit = isSplit && params.splitAmount1 != null ? (() => {
+    const [m1, m2] = params.paymentMethod.split("+");
+    return { method1: m1, amount1: params.splitAmount1!, method2: m2, amount2: params.paidAmount - params.splitAmount1! };
+  })() : null;
+
   const cookieStore = await cookies();
-  
+
   // Create normal client to verify cashier is logged in
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -95,6 +102,10 @@ export async function processCashierBooking(params: {
     }
 
     bookingId = rpcId;
+
+    if (paymentSplit) {
+      await supabase.from("bookings").update({ payment_split: paymentSplit } as never).eq("id", bookingId);
+    }
   } else {
     // ── Guest path: no WA provided ────────────────────────────
     const adminClient = createSupabaseClient(
@@ -122,6 +133,7 @@ export async function processCashierBooking(params: {
         base_amount: params.paidAmount,
         total_amount: params.paidAmount,
         payment_method: params.paymentMethod ?? "Cash",
+        payment_split: paymentSplit ?? null,
         is_paid: params.paidAmount > 0,
         is_open_session: params.durationMinutes === 0,
       } as never)
