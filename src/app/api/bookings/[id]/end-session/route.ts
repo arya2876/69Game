@@ -29,6 +29,7 @@ export async function PATCH(
 
     const body = await request.json().catch(() => ({}));
     const paymentMethod = body.payment_method || null;
+    const paymentSplit = body.payment_split || null;
 
     // Look up active shift for cashier (null for owner — no shift)
     let activeShiftId: string | null = null;
@@ -114,6 +115,7 @@ export async function PATCH(
           base_amount: finalAmount,
           is_paid: true,
           payment_method: paymentMethod,
+          payment_split: paymentSplit,
           payment_status: "PAID",
           shift_id: activeShiftId,
         } as never)
@@ -171,6 +173,7 @@ export async function PATCH(
         end_time: now.toISOString(),
         is_paid: true,
         payment_method: paymentMethod,
+        payment_split: paymentSplit,
         payment_status: "PAID",
         shift_id: activeShiftId,
       } as never)

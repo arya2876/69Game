@@ -32,7 +32,7 @@ interface Props {
   onSuccess: (bookingId: string) => void;
 }
 
-type PaymentMethod = "CASH" | "QRIS_STATIC";
+type PaymentMethod = "CASH" | "QRIS_STATIC" | "CASH+CASH" | "CASH+QRIS" | "QRIS+QRIS";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -84,6 +84,7 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
   // true by default: modal always shows a loading state until the first fetch resolves
   const [loadingItems, setLoadingItems] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [splitAmount1, setSplitAmount1] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   // Fetch accepted F&B items for this booking
@@ -100,7 +101,7 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
         setLoadingItems(false);
       });
     // Reset to loading=true so the next booking open starts clean
-    return () => { setOrderItems([]); setLoadingItems(true); };
+    return () => { setOrderItems([]); setLoadingItems(true); setSplitAmount1(0); setPaymentMethod("CASH"); };
   }, [isOpen, bookingId]);
 
   // Lock body scroll
@@ -131,13 +132,31 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
     ? fmtDuration(bookingInfo.startTime, nowMs)
     : fmtDuration(bookingInfo.startTime, bookingInfo.endTime);
 
+  const methodLabel: Record<PaymentMethod, string> = {
+    CASH: "Cash", QRIS_STATIC: "QRIS",
+    "CASH+CASH": "Cash+Cash", "CASH+QRIS": "Cash+QRIS", "QRIS+QRIS": "QRIS+QRIS",
+  };
+  const isSplit = paymentMethod.includes("+");
+  const normalizedMethod = methodLabel[paymentMethod];
+  const splitAmount2 = isSplit ? grandTotal - splitAmount1 : 0;
+  const paymentSplit = isSplit && splitAmount1 > 0
+    ? (() => { const [m1, m2] = normalizedMethod.split("+"); return { method1: m1, amount1: splitAmount1, method2: m2, amount2: splitAmount2 }; })()
+    : null;
+
   const handleSubmit = async () => {
+    if (isSplit && (splitAmount1 <= 0 || splitAmount1 >= grandTotal)) {
+      alert("Jumlah split tidak valid. Pastikan setiap metode > 0.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/bookings/${bookingId}/end-session`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payment_method: paymentMethod }),
+        body: JSON.stringify({
+          payment_method: normalizedMethod,
+          ...(paymentSplit ? { payment_split: paymentSplit } : {}),
+        }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -243,6 +262,7 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
             <div className="space-y-3">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Metode Pembayaran</p>
 
+              {/* Single method: 2 besar */}
               <div className="grid grid-cols-2 gap-3">
                 {(
                   [
@@ -250,9 +270,7 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
                     ["QRIS_STATIC", "QRIS Statis", "📱", "Transfer via QR code statis"],
                   ] as const
                 ).map(([value, label, icon, desc]) => (
-                  <button
-                    key={value}
-                    onClick={() => setPaymentMethod(value)}
+                  <button key={value} onClick={() => { setPaymentMethod(value); setSplitAmount1(0); }}
                     className={`relative flex flex-col items-center gap-2 py-4 px-3 rounded-xl border text-center transition-all ${
                       paymentMethod === value
                         ? "bg-neon-purple/10 border-neon-purple/50 text-neon-purple shadow-[0_0_18px_rgba(168,85,247,0.15)]"
@@ -271,11 +289,48 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
                 ))}
               </div>
 
+              {/* Split bill: 3 kecil */}
+              <div className="grid grid-cols-3 gap-2">
+                {(["CASH+CASH", "CASH+QRIS", "QRIS+QRIS"] as const).map(m => (
+                  <button key={m} onClick={() => { setPaymentMethod(m); setSplitAmount1(Math.floor(grandTotal / 2)); }}
+                    className={`py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                      paymentMethod === m
+                        ? "bg-neon-blue/15 border-neon-blue/50 text-neon-blue shadow-[0_0_12px_rgba(59,130,246,0.2)]"
+                        : "bg-slate-800/40 border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-300"
+                    }`}>
+                    {m.replace("+", " + ")}
+                  </button>
+                ))}
+              </div>
+
+              {/* Split amount input */}
+              {isSplit && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  className="p-3.5 bg-neon-blue/5 border border-neon-blue/20 rounded-xl space-y-2.5">
+                  <p className="text-[10px] font-bold text-neon-blue uppercase tracking-widest">Rincian Split</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-300 font-semibold w-16">{normalizedMethod.split("+")[0]}</span>
+                    <input type="number" min="0" max={grandTotal} step="1000"
+                      value={splitAmount1}
+                      onChange={e => setSplitAmount1(Math.max(0, Math.min(grandTotal, parseInt(e.target.value) || 0)))}
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white text-right outline-none font-mono focus:border-neon-blue/60 focus:ring-1 focus:ring-neon-blue/30"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-300 font-semibold w-16">{normalizedMethod.split("+")[1]}</span>
+                    <span className={`flex-1 text-right text-sm font-mono font-bold ${splitAmount2 < 0 ? "text-red-400" : "text-slate-200"}`}>
+                      {fmt(splitAmount2)}
+                    </span>
+                  </div>
+                  {splitAmount2 < 0 && (
+                    <p className="text-[10px] text-red-400">Jumlah melebihi total tagihan</p>
+                  )}
+                </motion.div>
+              )}
+
               {/* QRIS Cashier Reminder */}
               {paymentMethod === "QRIS_STATIC" && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-start gap-3 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl"
                 >
                   <SvgAlert />
@@ -300,13 +355,13 @@ export default function CheckoutModal({ isOpen, bookingId, bookingInfo, onClose,
             </button>
             <button
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || (isSplit && (splitAmount1 <= 0 || splitAmount1 >= grandTotal))}
               className="flex-[2] py-3 rounded-xl bg-gradient-to-r from-neon-purple to-neon-blue text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {submitting ? (
                 <><SvgLoader /> Memproses...</>
               ) : (
-                <><SvgCheck /> Konfirmasi {paymentMethod === "CASH" ? "Tunai" : "QRIS"}</>
+                <><SvgCheck /> {isSplit ? "Konfirmasi Split" : `Konfirmasi ${paymentMethod === "CASH" ? "Tunai" : "QRIS"}`}</>
               )}
             </button>
           </div>
